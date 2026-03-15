@@ -2,6 +2,10 @@ node_modules
 .turbo
 .env
 .env.local
+.DS_Store
+*.log
+coverage/
+plans/
 dist
 out
 .next
