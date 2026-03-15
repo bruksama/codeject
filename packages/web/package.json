@@ -1,0 +1,87 @@
+{
+  "name": "@codeject/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "rocketCritical": {
+    "dependencies": [
+      "next",
+      "react",
+      "react-dom",
+      "@dhiwise/component-tagger",
+      "@tailwindcss/typography",
+      "recharts"
+    ],
+    "devDependencies": [
+      "typescript",
+      "@types/node",
+      "@types/react",
+      "@types/react-dom",
+      "@typescript-eslint/eslint-plugin",
+      "@typescript-eslint/parser",
+      "eslint-config-next",
+      "tailwindcss",
+      "autoprefixer",
+      "postcss",
+      "eslint",
+      "prettier",
+      "@netlify/plugin-nextjs"
+    ],
+    "scripts": [
+      "dev",
+      "build",
+      "start",
+      "lint",
+      "lint:fix",
+      "format",
+      "serve",
+      "type-check"
+    ],
+    "warning": "🚨 CRITICAL: DO NOT REMOVE OR MODIFY ABOVE DEPENDENCIES - Required for Next.js 15 TypeScript app functionality"
+  },
+  "scripts": {
+    "dev": "next dev -p 4028",
+    "build": "next build",
+    "start": "next start -p 4028",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
+    "serve": "next start",
+    "type-check": "tsc -p tsconfig.typecheck.json --noEmit"
+  },
+  "dependencies": {
+    "@dhiwise/component-tagger": "1.0.14",
+    "@codeject/shared": "0.1.0",
+    "@heroicons/react": "2.2.0",
+    "@tailwindcss/forms": "0.5.11",
+    "@tailwindcss/typography": "0.5.19",
+    "lucide-react": "0.577.0",
+    "next": "16.1.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-hook-form": "7.71.2",
+    "recharts": "3.8.0",
+    "sonner": "2.0.7",
+    "zustand": "5.0.11"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.5",
+    "@netlify/plugin-nextjs": "5.15.9",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "25.5.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@typescript-eslint/eslint-plugin": "8.57.0",
+    "@typescript-eslint/parser": "8.57.0",
+    "autoprefixer": "10.4.27",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.1.6",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-prettier": "5.5.5",
+    "postcss": "8.5.8",
+    "prettier": "3.8.1",
+    "tailwindcss": "4.2.1",
+    "tailwindcss-animate": "1.0.7",
+    "typescript": "5.9.3"
+  }
+}

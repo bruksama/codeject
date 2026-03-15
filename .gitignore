@@ -1,0 +1,10 @@
+node_modules
+.turbo
+.env
+.env.local
+dist
+out
+.next
+packages/server/dist
+packages/web/out
+packages/web/.next
