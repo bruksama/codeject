@@ -4,9 +4,11 @@
 
 - Phase 1: complete
 - Phase 2: complete
-- Phase 3: pending
-- Phase 4: pending
+- Phase 3: complete
+- Phase 4: complete
 - Phase 5: pending
+- Terminal remote tmux bridge: complete
+- Hybrid chat-terminal supervisor: complete
 
 ## Phase 1
 
@@ -30,20 +32,27 @@ Completed:
 
 ## Phase 3
 
-Next:
+Completed:
 
-- PTY lifecycle manager
-- CLI adapters for Claude Code, Codex, and generic commands
-- output sanitization
-- WebSocket input/output bridge
+- tmux-backed terminal session manager with reconnect-safe runtime ownership
+- CLI adapters reused for launch command construction
+- session persistence for terminal metadata and terminal size
+- missing-tmux failure path with actionable error messaging
+- tmux session cleanup on stale-session removal and explicit delete
 
 ## Phase 4
 
-After phase 3:
+Completed:
 
-- replace frontend mock state with real API calls
-- replace simulated chat streaming with WebSocket-backed streaming
-- wire session creation and program CRUD to backend
+- frontend store now hydrates sessions and CLI programs from the backend
+- chat route now defaults to a derived transcript view while keeping terminal one tap away
+- new session flow creates real sessions on the server
+- CLI program editor persists CRUD changes through backend config routes
+- settings page uses auth/config APIs and keeps tunnel control deferred to phase 5
+- websocket reconnect restores the latest tmux snapshot instead of replaying transcript messages
+- mobile terminal controls now provide enter, backspace, ctrl, escape, tab, and arrow keys
+- conservative backend detection can mark sessions as terminal-required for approvals and menus
+- hybrid websocket frames now carry chat, surface, and terminal state together
 
 ## Phase 5
 
@@ -54,3 +63,9 @@ Later:
 - QR flow
 - remote auth UX
 
+Delivered before tunnel work:
+
+- one persistent tmux runtime per app session
+- tmux pane history remains the source of truth for runtime content
+- derived chat transcript is rebuilt from websocket bootstrap plus supervisor updates
+- terminal remains the guaranteed recovery path when chat extraction is ambiguous
