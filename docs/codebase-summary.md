@@ -37,6 +37,7 @@ Current state:
 - static export enabled
 - session list, settings, and CLI program flows are wired to the backend
 - chat route runs in hybrid mode with WebSocket-driven chat, surface, and terminal state
+- chat prompt submission now uses an optimistic local user/pending-assistant pair so the inline 3-dot state appears immediately instead of waiting for websocket roundtrips
 - terminal viewport uses xterm with mobile key strip and guarded resize handling
 
 ### `packages/server`
@@ -67,6 +68,7 @@ Current state:
 - session/config persistence implemented
 - tmux-backed runtime management implemented
 - chat transcript bootstrap prefers Claude/Codex provider transcripts when available
+- session supervisor now reserves a fresh assistant placeholder per prompt and blocks stale carry-over from the previous settled assistant answer
 - reconnect and stale-pane recovery paths are hardened to avoid server crashes
 
 ### `packages/shared`
