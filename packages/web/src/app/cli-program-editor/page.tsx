@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { X, Terminal, Folder, AlertCircle, Trash2, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
-import { CliProgram } from '@/types';
 
 interface CliProgramFormData {
   name: string;
@@ -170,8 +170,9 @@ function CliProgramEditorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const programId = searchParams.get('id');
+  const sessionApi = useSessionApi();
 
-  const { cliPrograms, addCliProgram, updateCliProgram, deleteCliProgram } = useAppStore();
+  const { cliPrograms, sessions } = useAppStore();
 
   const isEditing = !!programId;
   const existingProgram = cliPrograms.find((p) => p.id === programId);
@@ -201,36 +202,37 @@ function CliProgramEditorContent() {
     setValue('icon', selectedIcon);
   }, [selectedIcon, setValue]);
 
-  // BACKEND INTEGRATION: Validate that the command exists on the local machine
+  useEffect(() => {
+    if (cliPrograms.length > 0) return;
+    void sessionApi.loadCliPrograms().catch(() => undefined);
+  }, [cliPrograms.length, sessionApi]);
+
   const onSubmit = async (data: CliProgramFormData) => {
-    if (isEditing && existingProgram) {
-      updateCliProgram(existingProgram.id, {
-        name: data.name,
+    try {
+      await sessionApi.saveCliProgram({
         command: data.command,
-        icon: data.icon,
         defaultWorkingDir: data.defaultWorkingDir,
+        icon: data.icon,
+        id: existingProgram?.id,
+        name: data.name,
       });
-      toast.success(`${data.name} updated`);
-    } else {
-      const newProgram: CliProgram = {
-        id: `program-${Date.now()}`,
-        name: data.name,
-        command: data.command,
-        icon: data.icon,
-        defaultWorkingDir: data.defaultWorkingDir,
-      };
-      addCliProgram(newProgram);
-      toast.success(`${data.name} added to CLI programs`);
+      toast.success(isEditing ? `${data.name} updated` : `${data.name} added to CLI programs`);
+      router.back();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save program');
     }
-    router.back();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!existingProgram) return;
-    deleteCliProgram(existingProgram.id);
-    setShowDeleteModal(false);
-    toast.success(`${existingProgram.name} removed`);
-    router.back();
+    try {
+      await sessionApi.deleteCliProgram(existingProgram.id);
+      setShowDeleteModal(false);
+      toast.success(`${existingProgram.name} removed`);
+      router.back();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete program');
+    }
   };
 
   // Command preview
@@ -447,12 +449,10 @@ function CliProgramEditorContent() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-white/40">Sessions using this</span>
-                  <span className="text-xs text-white/60 font-medium">
-                    {/* BACKEND INTEGRATION: Count sessions using this program */}
+                  <span className="text-xs font-medium text-white/60">
                     {
-                      useAppStore
-                        .getState()
-                        .sessions.filter((s) => s.cliProgram.id === existingProgram.id).length
+                      sessions.filter((session) => session.cliProgram.id === existingProgram.id)
+                        .length
                     }{' '}
                     session(s)
                   </span>

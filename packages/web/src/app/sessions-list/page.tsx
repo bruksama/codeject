@@ -8,7 +8,7 @@ import AppLogo from '@/components/ui/AppLogo';
 import BottomTabBar from '@/components/ui/BottomTabBar';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
 import SessionCard from '@/components/sessions/SessionCard';
-
+import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
 import { Session } from '@/types';
 
@@ -108,12 +108,24 @@ function StatusSummary({ sessions }: { sessions: Session[] }) {
 
 export default function SessionsListPage() {
   const router = useRouter();
-  const { sessions, deleteSession } = useAppStore();
+  const sessionApi = useSessionApi();
+  const { sessions } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // BACKEND INTEGRATION: Replace with API call to fetch sessions from server
+  React.useEffect(() => {
+    void (async () => {
+      try {
+        await sessionApi.loadSessions();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load sessions');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [sessionApi]);
+
   const filteredSessions = sessions.filter((s) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -125,21 +137,27 @@ export default function SessionsListPage() {
   });
 
   const handleDelete = useCallback(
-    (id: string) => {
-      deleteSession(id);
-      toast.success('Session deleted');
+    async (id: string) => {
+      try {
+        await sessionApi.deleteSession(id);
+        toast.success('Session deleted');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete session');
+      }
     },
-    [deleteSession]
+    [sessionApi]
   );
 
-  // Pull-to-refresh simulation
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    // BACKEND INTEGRATION: Re-fetch sessions from server here
-    setTimeout(() => {
-      setIsRefreshing(false);
+    try {
+      await sessionApi.loadSessions();
       toast.success('Sessions refreshed');
-    }, 1200);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to refresh sessions');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (

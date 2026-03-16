@@ -5,18 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { X, Folder, Terminal, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
-import { CliProgram, Session } from '@/types';
+import { CliProgram } from '@/types';
 
 interface NewSessionFormData {
   programId: string;
   customCommand: string;
   workspacePath: string;
   sessionName: string;
-}
-
-function createSessionId() {
-  return `session-${globalThis.crypto?.randomUUID?.() ?? 'fallback-id'}`;
 }
 
 function generateSessionName(path: string): string {
@@ -79,7 +76,8 @@ const CUSTOM_PROGRAM: CliProgram = {
 
 export default function NewSessionSetupPage() {
   const router = useRouter();
-  const { cliPrograms, addSession, setActiveSession } = useAppStore();
+  const sessionApi = useSessionApi();
+  const { cliPrograms, setActiveSession } = useAppStore();
 
   const allPrograms = [...cliPrograms, CUSTOM_PROGRAM];
 
@@ -106,6 +104,11 @@ export default function NewSessionSetupPage() {
 
   // Auto-generate session name from path
   useEffect(() => {
+    if (cliPrograms.length > 0) return;
+    void sessionApi.loadCliPrograms().catch(() => undefined);
+  }, [cliPrograms.length, sessionApi]);
+
+  useEffect(() => {
     const generated = generateSessionName(workspacePath);
     if (generated && !sessionName) {
       setValue('sessionName', generated);
@@ -119,36 +122,26 @@ export default function NewSessionSetupPage() {
     if (generated) setValue('sessionName', generated);
   };
 
-  // BACKEND INTEGRATION: Replace with actual CLI process spawn via WebSocket/HTTP to local bridge
   const onSubmit = async (data: NewSessionFormData) => {
     const program = cliPrograms.find((p) => p.id === data.programId) || {
       ...CUSTOM_PROGRAM,
       command: data.customCommand,
     };
 
-    const newSession: Session = {
-      id: createSessionId(),
-      name: data.sessionName || generateSessionName(data.workspacePath) || 'new-session',
-      cliProgram: program,
-      workspacePath: data.workspacePath,
-      messages: [],
-      status: 'connecting',
-      createdAt: new Date(),
-      lastMessageAt: new Date(),
-    };
+    try {
+      const newSession = await sessionApi.createSession({
+        cliProgram: program,
+        name: data.sessionName || generateSessionName(data.workspacePath) || 'new-session',
+        sessionOptions: { terminal: { cols: 120, rows: 32 } },
+        workspacePath: data.workspacePath,
+      });
 
-    addSession(newSession);
-    setActiveSession(newSession.id);
-
-    toast.success(`Session "${newSession.name}" created`);
-
-    // Simulate connection
-    setTimeout(() => {
-      // BACKEND INTEGRATION: Update status based on actual connection result
-      toast.success(`Connected to ${program.name}`);
-    }, 1000);
-
-    router.push('/chat-interface');
+      setActiveSession(newSession.id);
+      toast.success(`Session "${newSession.name}" created`);
+      router.push('/chat-interface');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create session');
+    }
   };
 
   const selectedProgram = allPrograms.find((p) => p.id === selectedProgramId);

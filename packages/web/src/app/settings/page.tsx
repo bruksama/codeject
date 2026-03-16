@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Wifi,
@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSessionApi } from '@/hooks/use-session-api';
 import AppLogo from '@/components/ui/AppLogo';
 import BottomTabBar from '@/components/ui/BottomTabBar';
 import SettingsGroup from '@/components/ui/SettingsGroup';
@@ -99,6 +100,14 @@ function AccentColorPicker({
 function AuthKeyDisplay({ authKey }: { authKey: string }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  if (!authKey) {
+    return (
+      <div className="px-4 py-3">
+        <p className="text-xs text-white/40">No API key has been rotated in this browser yet.</p>
+      </div>
+    );
+  }
 
   const masked =
     authKey.slice(0, 8) + '•'.repeat(Math.max(0, authKey.length - 12)) + authKey.slice(-4);
@@ -205,31 +214,31 @@ const fontSizeLabels = { small: 'Small', medium: 'Medium', large: 'Large' };
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { cliPrograms, settings, updateSettings, updateRemoteAccess } = useAppStore();
+  const sessionApi = useSessionApi();
+  const { cliPrograms, sessions, settings, updateSettings, clearSessions, resetSettings } =
+    useAppStore();
 
   const [showQrCode, setShowQrCode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showAccentPicker, setShowAccentPicker] = useState(false);
+  const [isRotatingKey, setIsRotatingKey] = useState(false);
 
   const { remoteAccess, hapticFeedback, streamingEnabled, fontSize, accentColor } = settings;
 
-  // BACKEND INTEGRATION: Trigger Cloudflare tunnel start/stop via local bridge API
-  const handleTunnelToggle = (enabled: boolean) => {
-    updateRemoteAccess({
-      enabled,
-      tunnelStatus: enabled ? 'connecting' : 'inactive',
-    });
-    if (enabled) {
-      toast.info('Starting Cloudflare tunnel…');
-      setTimeout(() => {
-        updateRemoteAccess({
-          tunnelStatus: 'active',
-          tunnelUrl: 'https://codeject-xyz.trycloudflare.com',
-        });
-        toast.success('Tunnel active — remote access enabled');
-      }, 2000);
-    } else {
-      toast.success('Remote access disabled');
+  useEffect(() => {
+    void sessionApi.loadCliPrograms().catch(() => undefined);
+    void sessionApi.loadAuthStatus().catch(() => undefined);
+  }, [sessionApi]);
+
+  const handleRotateKey = async () => {
+    setIsRotatingKey(true);
+    try {
+      await sessionApi.rotateApiKey();
+      toast.success('API key rotated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to rotate API key');
+    } finally {
+      setIsRotatingKey(false);
     }
   };
 
@@ -285,71 +294,63 @@ export default function SettingsPage() {
         <SettingsGroup title="Remote Access">
           <SettingsItem
             icon={<Wifi size={16} className="text-purple-400" />}
-            label="Enable Remote Access"
-            sublabel="Connect from other devices via Cloudflare"
-            type="toggle"
-            checked={remoteAccess.enabled}
-            onToggle={handleTunnelToggle}
+            label="API Key Status"
+            sublabel="Remote requests require a bearer token"
+            type="value"
+            value={remoteAccess.enabled ? 'Configured' : 'Missing'}
             showDivider
           />
 
-          {remoteAccess.enabled && (
-            <>
-              {/* Tunnel status */}
-              <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: 'rgba(124,58,237,0.15)',
-                    border: '1px solid rgba(124,58,237,0.2)',
-                  }}
-                >
-                  <Zap size={14} className="text-purple-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white/90">Cloudflare Tunnel</p>
-                  {remoteAccess.tunnelUrl && remoteAccess.tunnelStatus === 'active' && (
-                    <p className="text-[11px] text-white/35 font-mono truncate mt-0.5">
-                      {remoteAccess.tunnelUrl}
-                    </p>
-                  )}
-                </div>
-                <TunnelStatusBadge status={remoteAccess.tunnelStatus} />
-              </div>
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{
+                background: 'rgba(124,58,237,0.15)',
+                border: '1px solid rgba(124,58,237,0.2)',
+              }}
+            >
+              <Zap size={14} className="text-purple-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white/90">Cloudflare Tunnel</p>
+              <p className="text-[11px] text-white/35 mt-0.5">
+                Tunnel controls land in Phase 5. Backend auth is live now.
+              </p>
+            </div>
+            <TunnelStatusBadge status={remoteAccess.tunnelStatus} />
+          </div>
 
-              {/* Auth key */}
-              <div className="border-b border-white/5">
-                <div className="flex items-center gap=3 px-4 py-2.5">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{
-                      background: 'rgba(124,58,237,0.15)',
-                      border: '1px solid rgba(124,58,237,0.2)',
-                    }}
-                  >
-                    <Eye size={14} className="text-purple-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white/90">Auth Key</p>
-                    <p className="text-xs text-white/35 mt-0.5">
-                      Used to authenticate remote connections
-                    </p>
-                  </div>
-                </div>
-                <AuthKeyDisplay authKey={remoteAccess.authKey} />
+          <div className="border-b border-white/5">
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: 'rgba(124,58,237,0.15)',
+                  border: '1px solid rgba(124,58,237,0.2)',
+                }}
+              >
+                <Eye size={14} className="text-purple-400" />
               </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white/90">Latest Rotated Key</p>
+                <p className="text-xs text-white/35 mt-0.5">
+                  Stored only in this browser after a local rotate request
+                </p>
+              </div>
+            </div>
+            <AuthKeyDisplay authKey={remoteAccess.authKey} />
+          </div>
 
-              {/* QR Code */}
-              <SettingsItem
-                icon={<QrCode size={16} className="text-purple-400" />}
-                label="Show QR Code"
-                sublabel="Scan to connect from another device"
-                type="disclosure"
-                showDivider={false}
-                onClick={() => setShowQrCode(true)}
-              />
-            </>
-          )}
+          <SettingsItem
+            icon={<QrCode size={16} className="text-purple-400" />}
+            label={isRotatingKey ? 'Rotating API Key…' : 'Rotate API Key'}
+            sublabel="Generates a new bearer token from the local backend"
+            type="disclosure"
+            showDivider={false}
+            onClick={() => {
+              void handleRotateKey();
+            }}
+          />
         </SettingsGroup>
 
         {/* Appearance */}
@@ -538,10 +539,10 @@ export default function SettingsPage() {
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-white/70 mb-1">
-                  {remoteAccess.tunnelUrl || 'Tunnel not active'}
+                  {remoteAccess.tunnelUrl || 'Tunnel arrives in Phase 5'}
                 </p>
                 <p className="text-xs text-white/35">
-                  Scan with another device to connect remotely
+                  API auth is ready. Tunnel control is not wired yet.
                 </p>
               </div>
               <div
@@ -569,9 +570,15 @@ export default function SettingsPage() {
           confirmLabel="Delete All"
           destructive
           onConfirm={() => {
-            // BACKEND INTEGRATION: Delete all sessions from server
-            setConfirmDelete(null);
-            toast.success('All sessions cleared');
+            void Promise.all(sessions.map((session) => sessionApi.deleteSession(session.id)))
+              .then(() => {
+                clearSessions();
+                setConfirmDelete(null);
+                toast.success('All sessions cleared');
+              })
+              .catch((error) => {
+                toast.error(error instanceof Error ? error.message : 'Failed to clear sessions');
+              });
           }}
           onCancel={() => setConfirmDelete(null)}
         />
@@ -579,10 +586,11 @@ export default function SettingsPage() {
       {confirmDelete === 'reset-settings' && (
         <ConfirmModal
           title="Reset Settings"
-          message="This will reset all settings to their defaults, including CLI programs and remote access configuration."
+          message="This resets local appearance and cached auth settings. Saved CLI programs remain on the backend."
           confirmLabel="Reset"
           destructive
           onConfirm={() => {
+            resetSettings();
             setConfirmDelete(null);
             toast.success('Settings reset to defaults');
           }}
