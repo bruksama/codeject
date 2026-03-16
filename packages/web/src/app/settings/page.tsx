@@ -20,35 +20,38 @@ import {
   Vibrate,
   AlertTriangle,
   X,
+  Play,
+  Square,
+  RefreshCw,
+  KeyRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSessionApi } from '@/hooks/use-session-api';
 import AppLogo from '@/components/ui/AppLogo';
 import BottomTabBar from '@/components/ui/BottomTabBar';
+import QrCodeGraphic from '@/components/ui/qr-code';
 import SettingsGroup from '@/components/ui/SettingsGroup';
 import SettingsItem from '@/components/ui/SettingsItem';
-
+import {
+  apiClient,
+  ApiError,
+  clearStoredApiKey,
+  getStoredApiKey,
+  setStoredApiKey,
+  type TunnelStatusResponse,
+} from '@/lib/api-client';
 import { useAppStore } from '@/stores/useAppStore';
-
-function getQrPixelIsDark(index: number) {
-  const isCorner =
-    (index < 30 && index % 10 < 3) ||
-    (index < 30 && index % 10 > 6) ||
-    (index >= 70 && index % 10 < 3);
-
-  // Deterministic pseudo-random pattern so render stays pure.
-  return isCorner || (index * 17 + 11) % 10 > 4;
-}
 
 // Tunnel status badge
 function TunnelStatusBadge({ status }: { status: string }) {
   const config = {
     active: { label: 'Active', bg: 'bg-green-500/15 text-green-400 border-green-500/25' },
     inactive: { label: 'Inactive', bg: 'bg-gray-500/15 text-gray-400 border-gray-500/25' },
-    connecting: {
-      label: 'Connecting',
+    starting: {
+      label: 'Starting',
       bg: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/25',
     },
+    stopping: { label: 'Stopping', bg: 'bg-orange-500/15 text-orange-400 border-orange-500/25' },
     error: { label: 'Error', bg: 'bg-red-500/15 text-red-400 border-red-500/25' },
   }[status] || { label: status, bg: 'bg-gray-500/15 text-gray-400 border-gray-500/25' };
 
@@ -222,6 +225,11 @@ export default function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showAccentPicker, setShowAccentPicker] = useState(false);
   const [isRotatingKey, setIsRotatingKey] = useState(false);
+  const [storedAuthKeyInput, setStoredAuthKeyInput] = useState('');
+  const [showStoredAuthKey, setShowStoredAuthKey] = useState(false);
+  const [isTunnelAction, setIsTunnelAction] = useState<'start' | 'stop' | 'restart' | null>(null);
+  const [tunnelDetails, setTunnelDetails] = useState<TunnelStatusResponse | null>(null);
+  const [tunnelError, setTunnelError] = useState<string | null>(null);
 
   const { remoteAccess, hapticFeedback, streamingEnabled, fontSize, accentColor } = settings;
 
@@ -230,10 +238,24 @@ export default function SettingsPage() {
     void sessionApi.loadAuthStatus().catch(() => undefined);
   }, [sessionApi]);
 
+  useEffect(() => {
+    setStoredAuthKeyInput(getStoredApiKey());
+    void loadTunnelStatus();
+
+    const pollTimer = window.setInterval(() => {
+      void loadTunnelStatus(true);
+    }, 5000);
+
+    return () => window.clearInterval(pollTimer);
+  }, []);
+
   const handleRotateKey = async () => {
     setIsRotatingKey(true);
     try {
-      await sessionApi.rotateApiKey();
+      const apiKey = await sessionApi.rotateApiKey();
+      setStoredAuthKeyInput(apiKey);
+      setTunnelError(null);
+      await loadTunnelStatus();
       toast.success('API key rotated');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to rotate API key');
@@ -246,6 +268,93 @@ export default function SettingsPage() {
     const cycle = { small: 'medium', medium: 'large', large: 'small' } as const;
     updateSettings({ fontSize: cycle[fontSize] });
   };
+
+  const loadTunnelStatus = async (silent = false) => {
+    try {
+      const tunnel = await apiClient.getTunnelStatus();
+      setTunnelDetails(tunnel);
+      setTunnelError(null);
+      useAppStore.getState().updateRemoteAccess({
+        enabled: tunnel.authConfigured,
+        tunnelStatus: tunnel.status,
+        tunnelUrl: tunnel.publicUrl,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setTunnelError(
+          'Enter the API key on this device to inspect remote access over the tunnel.'
+        );
+        if (!silent) {
+          useAppStore
+            .getState()
+            .updateRemoteAccess({ tunnelStatus: 'inactive', tunnelUrl: undefined });
+        }
+        return;
+      }
+      const message =
+        error instanceof Error ? error.message : 'Failed to load remote access status';
+      setTunnelError(message);
+      if (!silent) {
+        toast.error(message);
+      }
+    }
+  };
+
+  const handleTunnelAction = async (action: 'start' | 'stop' | 'restart') => {
+    setIsTunnelAction(action);
+    try {
+      const tunnel =
+        action === 'start'
+          ? await apiClient.startTunnel()
+          : action === 'stop'
+            ? await apiClient.stopTunnel()
+            : await apiClient.restartTunnel();
+      setTunnelDetails(tunnel);
+      setTunnelError(null);
+      useAppStore.getState().updateRemoteAccess({
+        enabled: tunnel.authConfigured,
+        tunnelStatus: tunnel.status,
+        tunnelUrl: tunnel.publicUrl,
+      });
+      toast.success(
+        action === 'start'
+          ? 'Remote access started'
+          : action === 'stop'
+            ? 'Remote access stopped'
+            : 'Remote access restarted'
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Tunnel action failed';
+      setTunnelError(message);
+      toast.error(message);
+    } finally {
+      setIsTunnelAction(null);
+    }
+  };
+
+  const handleSaveStoredKey = async () => {
+    const nextKey = storedAuthKeyInput.trim();
+
+    if (!nextKey) {
+      clearStoredApiKey();
+      useAppStore.getState().updateRemoteAccess({ authKey: '', tunnelUrl: undefined });
+      setTunnelError('Saved key cleared on this device.');
+      toast.success('Saved API key cleared');
+      return;
+    }
+
+    setStoredApiKey(nextKey);
+    useAppStore.getState().updateRemoteAccess({ authKey: nextKey });
+    setTunnelError(null);
+    await loadTunnelStatus();
+    toast.success('API key saved on this device');
+  };
+
+  const tunnelUrl = tunnelDetails?.publicUrl ?? remoteAccess.tunnelUrl;
+  const tunnelStatus = tunnelDetails?.status ?? remoteAccess.tunnelStatus;
+  const canStartTunnel = tunnelDetails?.canStart ?? remoteAccess.enabled;
+  const tunnelBusy =
+    isTunnelAction !== null || tunnelStatus === 'starting' || tunnelStatus === 'stopping';
 
   return (
     <div
@@ -314,10 +423,151 @@ export default function SettingsPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/90">Cloudflare Tunnel</p>
               <p className="text-[11px] text-white/35 mt-0.5">
-                Tunnel controls land in Phase 5. Backend auth is live now.
+                Manual start in dev. QR shares only the public URL.
               </p>
             </div>
-            <TunnelStatusBadge status={remoteAccess.tunnelStatus} />
+            <TunnelStatusBadge status={tunnelStatus} />
+          </div>
+
+          <div className="px-4 py-3 border-b border-white/5 space-y-3">
+            <div className="flex gap-2">
+              <button
+                onClick={() => void handleTunnelAction('start')}
+                disabled={tunnelBusy || !canStartTunnel}
+                className="flex-1 rounded-xl px-3 py-2.5 text-sm font-medium text-white/90 bg-green-500/15 border border-green-500/25 disabled:opacity-40"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Play size={14} className="text-green-400" />
+                  {isTunnelAction === 'start' ? 'Starting…' : 'Start'}
+                </span>
+              </button>
+              <button
+                onClick={() => void handleTunnelAction('stop')}
+                disabled={tunnelBusy || tunnelStatus === 'inactive'}
+                className="flex-1 rounded-xl px-3 py-2.5 text-sm font-medium text-white/90 bg-white/6 border border-white/10 disabled:opacity-40"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Square size={14} className="text-white/60" />
+                  {isTunnelAction === 'stop' ? 'Stopping…' : 'Stop'}
+                </span>
+              </button>
+              <button
+                onClick={() => void handleTunnelAction('restart')}
+                disabled={tunnelBusy || tunnelStatus === 'inactive'}
+                className="flex-1 rounded-xl px-3 py-2.5 text-sm font-medium text-white/90 bg-white/6 border border-white/10 disabled:opacity-40"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <RefreshCw size={14} className="text-white/60" />
+                  {isTunnelAction === 'restart' ? 'Restarting…' : 'Restart'}
+                </span>
+              </button>
+            </div>
+
+            <div
+              className="rounded-2xl px-3 py-3"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                    Public URL
+                  </p>
+                  <p className="text-sm text-white/80 break-all mt-1">
+                    {tunnelUrl ?? 'Tunnel not active'}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!tunnelUrl) return;
+                    try {
+                      await navigator.clipboard.writeText(tunnelUrl);
+                      toast.success('Tunnel URL copied');
+                    } catch {
+                      toast.error('Failed to copy tunnel URL');
+                    }
+                  }}
+                  disabled={!tunnelUrl}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/6 disabled:opacity-40"
+                  aria-label="Copy tunnel URL"
+                >
+                  <Copy size={14} className="text-white/50" />
+                </button>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setShowQrCode(true)}
+                  disabled={!tunnelUrl}
+                  className="rounded-xl px-3 py-2 text-xs font-medium text-white/85 bg-white/6 border border-white/10 disabled:opacity-40"
+                >
+                  Show QR
+                </button>
+                {tunnelDetails?.isDevelopment && (
+                  <span className="text-[11px] text-white/35 self-center">
+                    Dev mode stays manual. `Ctrl+C` stops the managed tunnel.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div
+              className="rounded-2xl px-3 py-3"
+              style={{
+                background: 'rgba(124,58,237,0.08)',
+                border: '1px solid rgba(124,58,237,0.18)',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <KeyRound size={14} className="text-purple-300" />
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
+                  Phone Auth
+                </p>
+              </div>
+              <p className="text-xs text-white/50 mt-2">
+                QR opens the public URL only. Paste the bearer key on the phone once, then REST and
+                WebSocket requests use it from browser storage.
+              </p>
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/5 border border-white/8 px-3 py-2">
+                <input
+                  value={storedAuthKeyInput}
+                  onChange={(event) => setStoredAuthKeyInput(event.target.value)}
+                  placeholder="Paste bearer key on this device"
+                  className="flex-1 bg-transparent text-xs text-white/80 outline-none placeholder:text-white/25"
+                  type={showStoredAuthKey ? 'text' : 'password'}
+                />
+                <button
+                  onClick={() => setShowStoredAuthKey((current) => !current)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/6"
+                  aria-label={showStoredAuthKey ? 'Hide stored key' : 'Show stored key'}
+                >
+                  {showStoredAuthKey ? (
+                    <EyeOff size={13} className="text-white/45" />
+                  ) : (
+                    <Eye size={13} className="text-white/45" />
+                  )}
+                </button>
+                <button
+                  onClick={() => void handleSaveStoredKey()}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 bg-white/8"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+
+            {(tunnelError ||
+              tunnelDetails?.lastError ||
+              tunnelDetails?.binaryAvailable === false) && (
+              <div className="rounded-xl px-3 py-2.5 bg-red-500/10 border border-red-500/20">
+                <p className="text-xs text-red-200/85">
+                  {tunnelError ??
+                    tunnelDetails?.lastError ??
+                    'cloudflared is required to start remote access.'}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="border-b border-white/5">
@@ -518,31 +768,13 @@ export default function SettingsPage() {
               </button>
             </div>
             <div className="flex flex-col items-center py-8 px-6 gap-4">
-              {/* Mock QR code grid */}
-              <div
-                className="w-48 h-48 rounded-2xl p-4 relative"
-                style={{ background: 'white' }}
-                aria-label="QR code for remote access"
-              >
-                <div className="w-full h-full grid grid-cols-10 grid-rows-10 gap-0.5">
-                  {Array.from({ length: 100 }).map((_, i) => {
-                    const isDark = getQrPixelIsDark(i);
-                    return (
-                      <div
-                        key={i}
-                        className="rounded-[1px]"
-                        style={{ background: isDark ? '#1a1a2e' : 'transparent' }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
+              {tunnelUrl ? <QrCodeGraphic value={tunnelUrl} /> : null}
               <div className="text-center">
                 <p className="text-sm font-medium text-white/70 mb-1">
-                  {remoteAccess.tunnelUrl || 'Tunnel arrives in Phase 5'}
+                  {tunnelUrl || 'Tunnel not active'}
                 </p>
                 <p className="text-xs text-white/35">
-                  API auth is ready. Tunnel control is not wired yet.
+                  Open the URL, then paste the bearer key on the phone from Settings.
                 </p>
               </div>
               <div
@@ -554,7 +786,7 @@ export default function SettingsPage() {
               >
                 <Eye size={13} className="text-purple-400 flex-shrink-0" />
                 <p className="text-xs text-white/50">
-                  Auth key required — keep this QR code private
+                  QR does not include the bearer key. Share the key separately.
                 </p>
               </div>
             </div>

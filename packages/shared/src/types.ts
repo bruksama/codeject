@@ -173,7 +173,7 @@ export type TerminalKey =
 
 export interface RemoteAccessSettings {
   enabled: boolean;
-  tunnelStatus: 'active' | 'inactive' | 'connecting' | 'error';
+  tunnelStatus: 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
   authKey: string;
   tunnelUrl?: string;
 }

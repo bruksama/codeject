@@ -4,6 +4,21 @@ import { type CliProgram, type ConnectionStatus, type Message, type Session } fr
 
 const API_KEY_STORAGE_KEY = 'codeject-api-key';
 
+export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
+
+export interface TunnelStatusResponse {
+  authConfigured: boolean;
+  autoStart: boolean;
+  binaryAvailable: boolean;
+  canStart: boolean;
+  isDevelopment: boolean;
+  lastError?: string;
+  managedPid?: number;
+  publicUrl?: string;
+  startedAt?: string;
+  status: TunnelLifecycleState;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -25,16 +40,19 @@ function getApiBaseUrl() {
 }
 
 export function getWebSocketUrl(sessionId: string) {
+  const storedApiKey = getStoredApiKey();
+  const tokenSuffix = storedApiKey ? `?token=${encodeURIComponent(storedApiKey)}` : '';
+
   if (typeof window === 'undefined') {
-    return `ws://127.0.0.1:3500/ws/${sessionId}`;
+    return `ws://127.0.0.1:3500/ws/${sessionId}${tokenSuffix}`;
   }
 
   if (window.location.port === '4028') {
-    return `ws://${getBaseHost()}:3500/ws/${sessionId}`;
+    return `ws://${getBaseHost()}:3500/ws/${sessionId}${tokenSuffix}`;
   }
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/ws/${sessionId}`;
+  return `${protocol}//${window.location.host}/ws/${sessionId}${tokenSuffix}`;
 }
 
 export function getStoredApiKey() {
@@ -45,6 +63,11 @@ export function getStoredApiKey() {
 export function setStoredApiKey(apiKey: string) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+}
+
+export function clearStoredApiKey() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(API_KEY_STORAGE_KEY);
 }
 
 function normalizeMessage(message: Message): Message {
@@ -156,6 +179,11 @@ export const apiClient = {
     return normalizeSession(payload.session);
   },
 
+  async getTunnelStatus() {
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel');
+    return payload.tunnel;
+  },
+
   async listCliPrograms() {
     const payload = await requestJson<{ cliPrograms: CliProgram[] }>('/api/config/programs');
     return payload.cliPrograms;
@@ -172,6 +200,13 @@ export const apiClient = {
     });
     setStoredApiKey(payload.apiKey);
     return payload.apiKey;
+  },
+
+  async restartTunnel() {
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel/restart', {
+      method: 'POST',
+    });
+    return payload.tunnel;
   },
 
   async saveCliProgram(program: Omit<CliProgram, 'id'> & { id?: string }) {
@@ -191,5 +226,19 @@ export const apiClient = {
       method: 'POST',
     });
     return payload.cliProgram;
+  },
+
+  async startTunnel() {
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel/start', {
+      method: 'POST',
+    });
+    return payload.tunnel;
+  },
+
+  async stopTunnel() {
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel/stop', {
+      method: 'POST',
+    });
+    return payload.tunnel;
   },
 };

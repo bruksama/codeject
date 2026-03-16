@@ -69,7 +69,7 @@ codeject/
 | 2 | Backend Core (Express + WS) | Complete | [phase-02](./phase-02-backend-core.md) |
 | 3 | CLI Bridge (node-pty + adapters) | Complete | [phase-03](./phase-03-cli-bridge.md) |
 | 4 | Frontend-Backend Integration | Complete | [phase-04](./phase-04-frontend-backend-integration.md) |
-| 5 | Remote Access (Tunnel + Auth) | Pending | [phase-05](./phase-05-remote-access.md) |
+| 5 | Remote Access (Tunnel + Auth) | Complete | [phase-05](./phase-05-remote-access.md) |
 
 ## Key Decisions
 

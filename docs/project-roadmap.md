@@ -6,7 +6,7 @@
 - Phase 2: complete
 - Phase 3: complete
 - Phase 4: complete
-- Phase 5: pending
+- Phase 5: complete
 - Terminal remote tmux bridge: complete
 - Hybrid chat-terminal supervisor: complete
 
@@ -62,12 +62,14 @@ Completed:
 
 ## Phase 5
 
-Later:
+Completed:
 
-- tunnel process manager
-- tunnel routes
-- QR flow
-- remote auth UX
+- backend-owned `cloudflared` tunnel manager with explicit `inactive -> starting -> active -> stopping -> error` lifecycle
+- stale managed tunnel PID cleanup on startup and managed shutdown on `SIGINT` / `SIGTERM`
+- proxy-aware auth checks so tunneled REST and WebSocket traffic no longer bypass local-only auth rules
+- tunnel routes for status, start, stop, and restart under `/api/tunnel`
+- settings page remote access controls, public URL copy, and real QR rendering for the tunnel URL only
+- device-local bearer key save flow so phone browsers can authenticate without embedding secrets in QR query params
 
 Delivered before tunnel work:
 

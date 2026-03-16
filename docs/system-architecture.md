@@ -35,12 +35,14 @@ The frontend is built as a static export and served by the backend.
 
 - Express 5 server
 - route modules for health, auth, sessions, and config
-- auth middleware that bypasses local requests
+- route modules for health, auth, sessions, config, and tunnel lifecycle
+- auth middleware that bypasses only real loopback clients and honors forwarded client IPs from proxies/tunnels
 - file-backed stores under `~/.codeject`
 - CLI adapters that still build the launch command for Claude Code, Codex, and generic shell programs
 - provider transcript parsers for Claude transcript `.jsonl` files and Codex rollout `.jsonl` files
 - tmux bridge service for session create, send-keys, resize, capture-pane, and kill-session
 - terminal session manager that maps app session IDs to tmux targets
+- tunnel manager that owns exactly one `cloudflared` child process, persists lifecycle metadata in config, clears stale managed PIDs on startup, and shuts the tunnel down on server exit
 - session supervisor that creates a pending assistant placeholder on prompt, prefers provider transcript content, falls back to sanitized tmux snapshots only when the current prompt can be anchored safely, derives conservative terminal-required signals, and emits high-confidence chat action requests for simple confirms and numbered selections
 - WebSocket upgrade handler with ping/pong heartbeat plus chat bootstrap/update, surface mode, and terminal init/snapshot/update frames
 - tmux runtimes stay alive across websocket disconnects until explicit delete or stale-session cleanup
@@ -71,14 +73,16 @@ The frontend is built as a static export and served by the backend.
 - local requests allowed without bearer auth
 - non-local requests require bearer auth
 - stored API key is hashed on disk
+- remote QR flow shares only the public tunnel URL; the bearer key is stored separately per browser/device
 
 ## Current Gap
 
-Frontend and backend now use a hybrid surface model over the same tmux runtime. Remote tunnel lifecycle and QR-based connection flow remain for phase 5.
+Frontend and backend now use a hybrid surface model over the same tmux runtime. Remote tunnel lifecycle now exists, but still depends on `cloudflared` being installed on the host.
 
 Current constraints:
 
 - host machine must have `tmux` installed
+- host machine must have `cloudflared` installed to enable remote access
 - snapshot mirroring currently refreshes whole terminal content instead of diff streaming
 - chat extraction is best-effort: provider transcript first, sanitized tmux fallback second
 - chat action extraction is intentionally narrow: yes/no confirms and numbered single-select only

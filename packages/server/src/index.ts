@@ -10,10 +10,12 @@ import { authRoutes } from './routes/auth-routes.js';
 import { configRoutes } from './routes/config-routes.js';
 import { healthRoutes } from './routes/health-routes.js';
 import { createSessionsRoutes } from './routes/sessions-routes.js';
+import { createTunnelRoutes } from './routes/tunnel-routes.js';
 import { authService } from './services/auth-service.js';
 import { SessionSupervisor } from './services/session-supervisor.js';
 import { sessionStore } from './services/session-store.js';
 import { TerminalSessionManager } from './services/terminal-session-manager.js';
+import { TunnelManager } from './services/tunnel-manager.js';
 import { TmuxBridge } from './services/tmux-bridge.js';
 import { logger } from './utils/logger.js';
 import { createWebSocketHandler } from './websocket/websocket-handler.js';
@@ -24,6 +26,8 @@ const webOutDir = path.resolve(__dirname, '../../web/out');
 
 async function bootstrap() {
   await authService.ensureApiKey();
+  const tunnelManager = new TunnelManager();
+  await tunnelManager.initialize();
 
   const app = express();
   const server = http.createServer(app);
@@ -55,6 +59,7 @@ async function bootstrap() {
   app.use('/api/auth', authRoutes);
   app.use('/api/sessions', optionalLocalAuth, createSessionsRoutes(terminalSessionManager));
   app.use('/api/config', optionalLocalAuth, configRoutes);
+  app.use('/api/tunnel', optionalLocalAuth, createTunnelRoutes(tunnelManager));
 
   app.use(express.static(webOutDir, { extensions: ['html'] }));
   app.use((_request, response) => {
@@ -72,6 +77,16 @@ async function bootstrap() {
   server.listen(environment.port, environment.host, () => {
     logger.info(`codeject server listening on http://${environment.host}:${environment.port}`);
   });
+
+  const shutdown = async (signal: string) => {
+    logger.info(`Received ${signal}, shutting down`);
+    await tunnelManager.shutdown();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    process.exit(0);
+  };
+
+  process.once('SIGINT', () => void shutdown('SIGINT'));
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
 bootstrap().catch((error) => {

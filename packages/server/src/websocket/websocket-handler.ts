@@ -120,7 +120,9 @@ export function createWebSocketHandler({
       }
 
       const token = requestUrl.searchParams.get('token') ?? '';
-      const isAuthorized = isLocalSocket(request.socket.remoteAddress) || (token && (await authService.validateApiKey(token)));
+      const isAuthorized =
+        isLocalSocket(request.headers, request.socket.remoteAddress) ||
+        (token && (await authService.validateApiKey(token)));
       if (!isAuthorized) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();

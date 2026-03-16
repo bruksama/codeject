@@ -15,7 +15,7 @@ Mobile-first web app for controlling local CLI coding assistants from a phone.
 - Phase 2 complete: backend core, REST API, auth, WebSocket handshake, disk persistence
 - Phase 3 complete: tmux-backed terminal bridge
 - Phase 4 complete: hybrid chat-first session experience over tmux runtime
-- Phase 5 pending: remote tunnel flow
+- Phase 5 complete: dev-safe remote tunnel flow
 
 ## Workspace Layout
 
@@ -65,6 +65,10 @@ codeject/
 - `POST /api/config/programs`
 - `PUT /api/config/programs/:programId`
 - `DELETE /api/config/programs/:programId`
+- `GET /api/tunnel`
+- `POST /api/tunnel/start`
+- `POST /api/tunnel/stop`
+- `POST /api/tunnel/restart`
 - `WS /ws/:sessionId`
 
 ## WebSocket Protocol
@@ -79,6 +83,8 @@ codeject/
 - Chat route now opens in chat mode and keeps terminal as fallback over `WS /ws/:sessionId`
 - CLI program editor uses `/api/config/programs`
 - Settings page uses real auth/config endpoints; tunnel controls remain Phase 5
+- Settings page now uses real tunnel status/start/stop/restart endpoints
+- Remote QR shares only the public tunnel URL; bearer key stays separate
 
 ## Dependency Policy
 
