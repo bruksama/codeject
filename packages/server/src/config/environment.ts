@@ -12,6 +12,7 @@ const sessionsDir = path.join(codejectHome, 'sessions');
 const configFile = path.join(codejectHome, 'config.json');
 
 export const environment = {
+  cliIdleTimeoutMs: 60 * 60 * 1000,
   codejectHome,
   configFile,
   host: process.env.HOST ?? DEFAULT_HOST,
@@ -21,4 +22,3 @@ export const environment = {
   staleSessionMs: 24 * 60 * 60 * 1000,
   websocketHeartbeatMs: 30_000,
 };
-

@@ -9,9 +9,12 @@ import { optionalLocalAuth } from './middleware/auth-middleware.js';
 import { authRoutes } from './routes/auth-routes.js';
 import { configRoutes } from './routes/config-routes.js';
 import { healthRoutes } from './routes/health-routes.js';
-import { sessionsRoutes } from './routes/sessions-routes.js';
+import { createSessionsRoutes } from './routes/sessions-routes.js';
 import { authService } from './services/auth-service.js';
+import { SessionSupervisor } from './services/session-supervisor.js';
 import { sessionStore } from './services/session-store.js';
+import { TerminalSessionManager } from './services/terminal-session-manager.js';
+import { TmuxBridge } from './services/tmux-bridge.js';
 import { logger } from './utils/logger.js';
 import { createWebSocketHandler } from './websocket/websocket-handler.js';
 
@@ -21,11 +24,23 @@ const webOutDir = path.resolve(__dirname, '../../web/out');
 
 async function bootstrap() {
   await authService.ensureApiKey();
-  await sessionStore.cleanupStaleSessions();
 
   const app = express();
   const server = http.createServer(app);
-  const websocketHandler = createWebSocketHandler();
+  const tmuxBridge = new TmuxBridge();
+  const terminalSessionManager = new TerminalSessionManager(
+    sessionStore,
+    tmuxBridge,
+    environment.cliIdleTimeoutMs
+  );
+  const sessionSupervisor = new SessionSupervisor(sessionStore);
+  const staleSessions = await sessionStore.cleanupStaleSessions();
+  await terminalSessionManager.stopSessions(staleSessions);
+  const websocketHandler = createWebSocketHandler({
+    sessionStore,
+    sessionSupervisor,
+    terminalSessionManager,
+  });
 
   app.set('trust proxy', true);
   app.use(
@@ -38,7 +53,7 @@ async function bootstrap() {
 
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
-  app.use('/api/sessions', optionalLocalAuth, sessionsRoutes);
+  app.use('/api/sessions', optionalLocalAuth, createSessionsRoutes(terminalSessionManager));
   app.use('/api/config', optionalLocalAuth, configRoutes);
 
   app.use(express.static(webOutDir, { extensions: ['html'] }));
