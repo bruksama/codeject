@@ -18,7 +18,9 @@ export async function readJsonFile<T>(filePath: string, fallback: T): Promise<T>
 
 export async function writeJsonFile(filePath: string, value: unknown) {
   await ensureDirectory(path.dirname(filePath));
-  await fs.writeFile(filePath, JSON.stringify(value, null, 2), 'utf8');
+  const tempFilePath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tempFilePath, JSON.stringify(value, null, 2), 'utf8');
+  await fs.rename(tempFilePath, filePath);
 }
 
 export async function deleteFileIfExists(filePath: string) {
@@ -29,4 +31,3 @@ export async function deleteFileIfExists(filePath: string) {
     if (!isMissing) throw error;
   }
 }
-
