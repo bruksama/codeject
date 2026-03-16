@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowDown } from 'lucide-react';
 import { ChatActionCard } from '@/components/chat/chat-action-card';
 import ChatMessage from '@/components/chat/ChatMessage';
 import StreamingIndicator from '@/components/ui/StreamingIndicator';
@@ -13,6 +15,7 @@ interface ChatTranscriptProps {
   onSubmitAction?: (submit: string) => void;
   programIcon?: string;
   programName?: string;
+  sessionId?: string;
 }
 
 const SUGGESTED_PROMPTS = [
@@ -22,6 +25,8 @@ const SUGGESTED_PROMPTS = [
   'Plan the next implementation step',
 ];
 
+const BOTTOM_THRESHOLD_PX = 96;
+
 export function ChatTranscript({
   chatState,
   isSubmittingAction = false,
@@ -30,7 +35,13 @@ export function ChatTranscript({
   onSubmitAction,
   programIcon = '🤖',
   programName = 'CLI',
+  sessionId,
 }: ChatTranscriptProps) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const hasAutoScrolledRef = useRef(false);
+  const shouldFollowRef = useRef(true);
+  const previousSessionIdRef = useRef<string | undefined>(sessionId);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const visibleMessages = messages.filter(
     (message) => !(message.role === 'assistant' && !message.isStreaming && !message.content.trim())
   );
@@ -40,6 +51,56 @@ export function ChatTranscript({
   );
   const showStreamingIndicator =
     chatState?.phase === 'awaiting-assistant' || chatState?.phase === 'streaming-assistant';
+  const latestMessageId = visibleMessages.at(-1)?.id;
+  const isNearBottom = useCallback((element: HTMLDivElement) => {
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    return distanceFromBottom <= BOTTOM_THRESHOLD_PX;
+  }, []);
+
+  const syncBottomState = useCallback(() => {
+    const element = scrollContainerRef.current;
+    if (!element) return;
+    const nearBottom = isNearBottom(element);
+    shouldFollowRef.current = nearBottom;
+    setShowJumpToLatest(!nearBottom);
+  }, [isNearBottom]);
+
+  const scrollToLatest = useCallback((behavior: ScrollBehavior) => {
+    const element = scrollContainerRef.current;
+    if (!element) return;
+    element.scrollTo({ behavior, top: element.scrollHeight });
+    shouldFollowRef.current = true;
+    setShowJumpToLatest(false);
+  }, []);
+
+  useEffect(() => {
+    if (previousSessionIdRef.current === sessionId) return;
+    previousSessionIdRef.current = sessionId;
+    hasAutoScrolledRef.current = false;
+    shouldFollowRef.current = true;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!visibleMessages.length) {
+      hasAutoScrolledRef.current = false;
+      shouldFollowRef.current = true;
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      if (!hasAutoScrolledRef.current) {
+        hasAutoScrolledRef.current = true;
+        scrollToLatest('auto');
+        return;
+      }
+
+      if (shouldFollowRef.current) {
+        scrollToLatest('auto');
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [latestMessageId, scrollToLatest, showStreamingIndicator, visibleMessages.length]);
 
   if (!hasMessages) {
     return (
@@ -72,28 +133,43 @@ export function ChatTranscript({
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-2 pt-1">
-      {visibleMessages.map((message) =>
-        message.role === 'assistant' && message.isStreaming && !message.content.trim() ? (
-          <StreamingIndicator
-            key={message.id}
-            programIcon={programIcon}
-            programName={programName}
+    <div className="relative flex h-full min-h-0 flex-col">
+      <div
+        ref={scrollContainerRef}
+        className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-14 pt-1"
+        onScroll={syncBottomState}
+      >
+        {visibleMessages.map((message) =>
+          message.role === 'assistant' && message.isStreaming && !message.content.trim() ? (
+            <StreamingIndicator
+              key={message.id}
+              programIcon={programIcon}
+              programName={programName}
+            />
+          ) : (
+            <ChatMessage key={message.id} message={message} programIcon={programIcon} />
+          )
+        )}
+        {chatState?.actionRequest && onOpenTerminal && onSubmitAction ? (
+          <ChatActionCard
+            actionRequest={chatState.actionRequest}
+            isSubmitting={isSubmittingAction}
+            onOpenTerminal={onOpenTerminal}
+            onSubmit={onSubmitAction}
           />
-        ) : (
-          <ChatMessage key={message.id} message={message} programIcon={programIcon} />
-        )
-      )}
-      {chatState?.actionRequest && onOpenTerminal && onSubmitAction ? (
-        <ChatActionCard
-          actionRequest={chatState.actionRequest}
-          isSubmitting={isSubmittingAction}
-          onOpenTerminal={onOpenTerminal}
-          onSubmit={onSubmitAction}
-        />
-      ) : null}
-      {showStreamingIndicator && !hasInlineStreamingAssistant ? (
-        <StreamingIndicator programIcon={programIcon} programName={programName} />
+        ) : null}
+        {showStreamingIndicator && !hasInlineStreamingAssistant ? (
+          <StreamingIndicator programIcon={programIcon} programName={programName} />
+        ) : null}
+      </div>
+      {showJumpToLatest ? (
+        <button
+          className="glass-elevated absolute bottom-3 left-1/2 flex h-11 min-w-11 -translate-x-1/2 items-center justify-center rounded-full px-3 text-white/90 shadow-[0_12px_30px_rgba(0,0,0,0.32)]"
+          onClick={() => scrollToLatest('smooth')}
+          type="button"
+        >
+          <ArrowDown size={18} />
+        </button>
       ) : null}
     </div>
   );

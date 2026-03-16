@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RefreshCcw, SendHorizontal } from 'lucide-react';
+import { ArrowLeft, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
+import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatTranscript } from '@/components/chat/chat-transcript';
 import { HybridSurfaceToggle } from '@/components/chat/hybrid-surface-toggle';
 import { TerminalRequiredBanner } from '@/components/chat/terminal-required-banner';
@@ -95,47 +96,47 @@ export default function ChatInterfacePage() {
 
   return (
     <div
-      className="flex h-dvh overflow-hidden flex-col bg-[#08080f] px-3 pb-4"
+      className="flex h-dvh overflow-hidden flex-col bg-[#08080f] px-2.5 pb-3"
       style={{ paddingTop: 'env(safe-area-inset-top, 44px)' }}
     >
-      <header className="mb-3 flex items-center gap-3 py-3">
+      <header className="mb-2 flex items-center gap-2.5 py-2">
         <button
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-white/70"
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/70"
           onClick={() => router.push('/sessions-list')}
           type="button"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={17} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-base">{session.cliProgram.icon}</span>
-            <span className="truncate text-sm font-semibold text-white/90">{session.name}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">{session.cliProgram.icon}</span>
+            <span className="truncate text-[13px] font-semibold text-white/90">{session.name}</span>
             <ConnectionBadge showLabel size="sm" status={hybrid.status} />
           </div>
-          <p className="mt-0.5 truncate font-mono text-[11px] text-white/35">
+          <p className="mt-0.5 truncate font-mono text-[10px] text-white/32">
             {session.workspacePath}
           </p>
         </div>
         <button
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-white/70"
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/70"
           onClick={() => {
             hybrid.reconnect();
             toast.success(`Reconnecting ${session.cliProgram.name}`);
           }}
           type="button"
         >
-          <RefreshCcw size={17} />
+          <RefreshCcw size={16} />
         </button>
       </header>
 
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <HybridSurfaceToggle activeMode={hybrid.surfaceMode} onModeChange={hybrid.openSurface} />
-        <div className="truncate rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-white/45">
+        <div className="truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/42">
           {session.terminal?.sessionName ? `tmux:${session.terminal.sessionName}` : 'tmux starting'}
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5">
         {showTerminalRequired ? (
           <TerminalRequiredBanner
             onOpenTerminal={() => hybrid.openSurface('terminal')}
@@ -164,7 +165,7 @@ export default function ChatInterfacePage() {
           </div>
         ) : (
           <>
-            <div className="glass-card min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
+            <div className="glass-card min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] p-3">
               <ChatTranscript
                 chatState={hybrid.chatState}
                 isSubmittingAction={isSubmittingAction}
@@ -173,34 +174,16 @@ export default function ChatInterfacePage() {
                 onSubmitAction={handleActionSubmit}
                 programIcon={session.cliProgram.icon}
                 programName={session.cliProgram.name}
+                sessionId={session.id}
               />
             </div>
-            <div className="glass-card rounded-[24px] border border-white/10 p-3">
-              <div className="flex items-end gap-3">
-                <textarea
-                  className="auto-grow-textarea input-focus min-h-[48px] flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90 placeholder:text-white/25"
-                  onChange={(event) => setChatDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      handleChatSubmit();
-                    }
-                  }}
-                  placeholder="Message your CLI session"
-                  value={chatDraft}
-                />
-                <button
-                  className="accent-gradient flex h-11 w-11 items-center justify-center rounded-2xl text-white active:scale-[0.98]"
-                  onClick={handleChatSubmit}
-                  type="button"
-                >
-                  <SendHorizontal size={17} />
-                </button>
-              </div>
-              {hybrid.lastError ? (
-                <p className="px-1 pt-2 text-xs text-red-400/85">{hybrid.lastError}</p>
-              ) : null}
-            </div>
+            <ChatComposer
+              disabled={hybrid.status === 'error'}
+              errorMessage={hybrid.lastError}
+              onSubmit={handleChatSubmit}
+              onValueChange={setChatDraft}
+              value={chatDraft}
+            />
           </>
         )}
       </div>
