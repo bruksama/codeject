@@ -1,10 +1,17 @@
 export type {
   AppSettings,
   AppState,
+  ChatState,
+  ChatStatePhase,
   CliProgram,
   ConnectionStatus,
   Message,
   MessageRole,
   RemoteAccessSettings,
   Session,
+  SurfaceMode,
+  SurfaceRequirement,
+  TerminalKey,
+  TerminalRuntime,
+  TerminalSnapshot,
 } from '@codeject/shared';

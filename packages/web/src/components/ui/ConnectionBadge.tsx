@@ -26,6 +26,12 @@ const statusConfig: Record<
     badgeClass: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/25',
     pulse: true,
   },
+  starting: {
+    label: 'Starting',
+    dotClass: 'bg-amber-400',
+    badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/25',
+    pulse: true,
+  },
   idle: {
     label: 'Idle',
     dotClass: 'bg-blue-400',
