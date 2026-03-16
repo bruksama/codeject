@@ -258,13 +258,15 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
         role: 'assistant',
         timestamp,
       };
+      const resolvedPhase =
+        session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
 
       return (
         (await this.sessionStore.updateSession(session.id, {
           chatState: {
             ...session.chatState,
             lastAssistantMessageId: message.id,
-            phase: session.chatState?.phase ?? 'idle',
+            phase: resolvedPhase,
             transcriptUpdatedAt: timestamp,
           },
           lastMessageAt: timestamp,
@@ -277,7 +279,14 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     if (!lastAssistantMessageId) return session;
 
     const currentMessage = session.messages.find((message) => message.id === lastAssistantMessageId);
-    if (currentMessage?.content === transcriptContent && !currentMessage.isStreaming) {
+    const resolvedPhase =
+      session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
+
+    if (
+      currentMessage?.content === transcriptContent &&
+      !currentMessage.isStreaming &&
+      session.chatState?.phase === resolvedPhase
+    ) {
       return session;
     }
 
@@ -287,7 +296,7 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
         chatState: {
           ...session.chatState,
           lastAssistantMessageId,
-          phase: session.chatState?.phase ?? 'idle',
+          phase: resolvedPhase,
           transcriptUpdatedAt: timestamp,
         },
         lastMessageAt: timestamp,

@@ -71,26 +71,31 @@ export class ProviderTranscriptReader {
 
   private async resolveTranscriptPath(session: Session) {
     const persisted = session.providerRuntime?.transcriptPath;
-    if (persisted && (await fileExists(persisted))) {
-      return {
-        filePath: persisted,
-        kind: session.providerRuntime?.provider === 'codex' ? 'codex' : 'claude',
-      } satisfies ResolvedTranscript;
-    }
+    const persistedResolved =
+      persisted && (await fileExists(persisted))
+        ? ({
+            filePath: persisted,
+            kind: session.providerRuntime?.provider === 'codex' ? 'codex' : 'claude',
+          } satisfies ResolvedTranscript)
+        : null;
 
     const cached = this.resolvedPaths.get(session.id);
-    if (cached && (await fileExists(cached.filePath))) {
-      return cached;
+    const cachedResolved = cached && (await fileExists(cached.filePath)) ? cached : null;
+    const current = persistedResolved ?? cachedResolved;
+
+    if (current && !(await shouldRefreshTranscriptPath(session, current.filePath))) {
+      return current;
     }
 
     const next =
-      (await this.resolveClaudeTranscriptPath(session)) ?? (await this.resolveCodexRolloutPath(session));
+      (await this.resolveClaudeTranscriptPath(session)) ??
+      (await this.resolveCodexRolloutPath(session, current?.filePath));
 
     if (next) {
       this.resolvedPaths.set(session.id, next);
     }
 
-    return next;
+    return next ?? current;
   }
 
   private async persistMetadata(session: Session, metadata: ProviderRuntimeMetadata) {
@@ -119,16 +124,20 @@ export class ProviderTranscriptReader {
     return filePath ? { filePath, kind: 'claude' as const } : null;
   }
 
-  private async resolveCodexRolloutPath(session: Session) {
+  private async resolveCodexRolloutPath(session: Session, currentFilePath?: string) {
     if (!isCodexSession(session)) return null;
     const files = await listJsonlFiles(cliTranscriptPaths.codexSessionsDir, true);
     let best: { filePath: string; mtimeMs: number } | null = null;
     const workspacePath = normalizeWorkspacePath(session.workspacePath);
+    const currentMtimeMs = currentFilePath
+      ? (await fs.stat(currentFilePath).catch(() => null))?.mtimeMs ?? 0
+      : 0;
 
     for (const filePath of files) {
       const meta = await readCodexSessionMeta(filePath);
       if (meta?.cwd !== workspacePath) continue;
       if (meta.mtimeMs < session.createdAt.getTime()) continue;
+      if (meta.mtimeMs <= currentMtimeMs) continue;
       if (!best || meta.mtimeMs > best.mtimeMs) {
         best = { filePath, mtimeMs: meta.mtimeMs };
       }
@@ -188,4 +197,27 @@ function isCodexSession(session: Session) {
 
 function normalizeWorkspacePath(workspacePath: string) {
   return path.resolve(expandHomePath(workspacePath));
+}
+
+async function shouldRefreshTranscriptPath(session: Session, filePath: string) {
+  if (session.providerRuntime?.provider !== 'codex') {
+    return false;
+  }
+
+  const phase = session.chatState?.phase;
+  if (phase !== 'awaiting-assistant' && phase !== 'streaming-assistant') {
+    return false;
+  }
+
+  const transcriptUpdatedAt = session.chatState?.transcriptUpdatedAt?.getTime();
+  if (!transcriptUpdatedAt) {
+    return false;
+  }
+
+  const stats = await fs.stat(filePath).catch(() => null);
+  if (!stats) {
+    return true;
+  }
+
+  return stats.mtimeMs <= transcriptUpdatedAt;
 }
