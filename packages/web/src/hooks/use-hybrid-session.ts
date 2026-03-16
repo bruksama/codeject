@@ -68,6 +68,10 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
       onMessage: (message) => {
         switch (message.type) {
           case 'chat:bootstrap':
+            setState((current) => ({
+              ...current,
+              chatState: normalizeChatState(message.chatState),
+            }));
             updateSession(sessionId, {
               chatState: normalizeChatState(message.chatState),
               messages: message.messages.map(normalizeMessage),
@@ -172,6 +176,12 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
         const trimmed = content.trim();
         if (!trimmed) return false;
         clientRef.current?.send({ content: trimmed, type: 'chat:prompt' });
+        return true;
+      },
+      submitActionInput(data: string) {
+        if (!data.length) return false;
+        clientRef.current?.send({ data, type: 'terminal:input' });
+        clientRef.current?.send({ key: 'Enter', type: 'terminal:key' });
         return true;
       },
       sendTerminalInput(data: string) {

@@ -61,11 +61,34 @@ export interface CliSessionOptions {
 }
 
 export interface ChatState {
+  actionRequest?: ChatActionRequest;
   lastAssistantMessageId?: string;
   lastPrompt?: string;
   phase: ChatStatePhase;
   terminalRequiredReason?: string;
   transcriptUpdatedAt?: Date;
+}
+
+export type ChatActionRequest =
+  | {
+      id: string;
+      kind: 'confirm';
+      prompt: string;
+      options: [ChatActionOption, ChatActionOption];
+      source: 'terminal' | 'transcript';
+    }
+  | {
+      id: string;
+      kind: 'single-select';
+      options: ChatActionOption[];
+      prompt: string;
+      source: 'terminal' | 'transcript';
+    };
+
+export interface ChatActionOption {
+  label: string;
+  submit: string;
+  value: string;
 }
 
 export interface ProviderRuntime {

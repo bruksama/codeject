@@ -21,6 +21,7 @@ export default function ChatInterfacePage() {
   const { sessions, activeSessionId } = useAppStore();
   const session = sessions.find((item) => item.id === activeSessionId) ?? sessions[0];
   const [chatDraft, setChatDraft] = useState('');
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [terminalDraft, setTerminalDraft] = useState('');
   const [terminalSize, setTerminalSize] = useState({ cols: 120, rows: 32 });
   const hybrid = useHybridSession(session?.id, terminalSize);
@@ -59,6 +60,19 @@ export default function ChatInterfacePage() {
     [hybrid]
   );
 
+  const handleActionSubmit = useCallback(
+    (submit: string) => {
+      const actionRequest = hybrid.chatState?.actionRequest;
+      if (!actionRequest) return;
+      if (!hybrid.submitActionInput(submit)) {
+        toast.error('Terminal input is unavailable');
+        return;
+      }
+      setPendingActionId(actionRequest.id);
+    },
+    [hybrid]
+  );
+
   if (!session) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#08080f] px-6 text-center">
@@ -76,6 +90,8 @@ export default function ChatInterfacePage() {
 
   const showTerminalRequired = hybrid.surfaceRequirement === 'terminal-required';
   const showTerminal = hybrid.surfaceMode === 'terminal';
+  const isSubmittingAction =
+    Boolean(pendingActionId) && pendingActionId === hybrid.chatState?.actionRequest?.id;
 
   return (
     <div
@@ -150,7 +166,11 @@ export default function ChatInterfacePage() {
           <>
             <div className="glass-card min-h-0 flex-1 overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
               <ChatTranscript
+                chatState={hybrid.chatState}
+                isSubmittingAction={isSubmittingAction}
                 messages={hybrid.messages}
+                onOpenTerminal={() => hybrid.openSurface('terminal')}
+                onSubmitAction={handleActionSubmit}
                 programIcon={session.cliProgram.icon}
                 programName={session.cliProgram.name}
               />

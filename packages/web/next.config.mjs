@@ -2,6 +2,7 @@ import { imageHosts } from './image-hosts.config.js';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  devIndicators: false,
   output: 'export',
   trailingSlash: true,
   productionBrowserSourceMaps: true,

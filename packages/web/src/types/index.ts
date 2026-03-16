@@ -1,4 +1,6 @@
 export type {
+  ChatActionOption,
+  ChatActionRequest,
   AppSettings,
   AppState,
   ChatState,

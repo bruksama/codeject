@@ -1,11 +1,16 @@
 'use client';
 
+import { ChatActionCard } from '@/components/chat/chat-action-card';
 import ChatMessage from '@/components/chat/ChatMessage';
 import StreamingIndicator from '@/components/ui/StreamingIndicator';
-import { type Message } from '@/types';
+import { type ChatState, type Message } from '@/types';
 
 interface ChatTranscriptProps {
+  chatState?: ChatState;
+  isSubmittingAction?: boolean;
   messages: Message[];
+  onOpenTerminal?: () => void;
+  onSubmitAction?: (submit: string) => void;
   programIcon?: string;
   programName?: string;
 }
@@ -18,12 +23,20 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export function ChatTranscript({
+  chatState,
+  isSubmittingAction = false,
   messages,
+  onOpenTerminal,
+  onSubmitAction,
   programIcon = '🤖',
   programName = 'CLI',
 }: ChatTranscriptProps) {
-  const hasMessages = messages.length > 0;
-  const lastMessage = messages[messages.length - 1];
+  const visibleMessages = messages.filter(
+    (message) => !(message.role === 'assistant' && message.isStreaming)
+  );
+  const hasMessages = visibleMessages.length > 0;
+  const showStreamingIndicator =
+    chatState?.phase === 'awaiting-assistant' || chatState?.phase === 'streaming-assistant';
 
   if (!hasMessages) {
     return (
@@ -46,16 +59,29 @@ export function ChatTranscript({
             </span>
           ))}
         </div>
+        {showStreamingIndicator ? (
+          <div className="mt-8 w-full max-w-sm">
+            <StreamingIndicator programIcon={programIcon} programName={programName} />
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-2 pt-1">
-      {messages.map((message) => (
+      {visibleMessages.map((message) => (
         <ChatMessage key={message.id} message={message} programIcon={programIcon} />
       ))}
-      {lastMessage?.role === 'assistant' && lastMessage.isStreaming ? (
+      {chatState?.actionRequest && onOpenTerminal && onSubmitAction ? (
+        <ChatActionCard
+          actionRequest={chatState.actionRequest}
+          isSubmitting={isSubmittingAction}
+          onOpenTerminal={onOpenTerminal}
+          onSubmit={onSubmitAction}
+        />
+      ) : null}
+      {showStreamingIndicator ? (
         <StreamingIndicator programIcon={programIcon} programName={programName} />
       ) : null}
     </div>

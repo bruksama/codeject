@@ -15,6 +15,7 @@ interface ResolvedTranscript {
 interface ProviderTranscriptResult {
   content: string | null;
   didPersistMetadata: boolean;
+  updatedAt?: Date;
 }
 
 interface ProviderRuntimeMetadata {
@@ -34,8 +35,12 @@ export class ProviderTranscriptReader {
       return {
         content: null,
         didPersistMetadata: false,
+        updatedAt: undefined,
       } satisfies ProviderTranscriptResult;
     }
+
+    const stats = await fs.stat(resolved.filePath).catch(() => null);
+    const updatedAt = stats ? new Date(stats.mtimeMs) : undefined;
 
     if (resolved.kind === 'claude') {
       const transcript = await parseClaudeTranscriptFile(resolved.filePath).catch(() => null);
@@ -47,6 +52,7 @@ export class ProviderTranscriptReader {
       return {
         content: transcript?.lastAssistantMessage || null,
         didPersistMetadata,
+        updatedAt,
       } satisfies ProviderTranscriptResult;
     }
 
@@ -59,6 +65,7 @@ export class ProviderTranscriptReader {
     return {
       content: rollout?.lastAssistantMessage || null,
       didPersistMetadata,
+      updatedAt,
     } satisfies ProviderTranscriptResult;
   }
 

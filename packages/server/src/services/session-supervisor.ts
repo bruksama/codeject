@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  type ChatActionRequest,
   type ChatState,
   type Message,
   type Session,
@@ -10,7 +11,8 @@ import {
 } from '@codeject/shared';
 import { ProviderTranscriptReader } from './provider-transcript-reader.js';
 import { type SessionStore } from './session-store.js';
-import { extractChatResponseFromTerminal } from '../utils/output-sanitizer.js';
+import { extractChatResponseFromTerminal, sanitizeOutput } from '../utils/output-sanitizer.js';
+import { extractActionRequest } from '../utils/action-request-extractor.js';
 
 interface SupervisorEvents {
   'chat:message': [sessionId: string, message: Message];
@@ -62,6 +64,8 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
       timestamp,
     };
     const chatState: ChatState = {
+      actionRequest: undefined,
+      lastAssistantMessageId: undefined,
       lastPrompt: message.content,
       phase: 'awaiting-assistant',
       transcriptUpdatedAt: timestamp,
@@ -106,16 +110,27 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     if (!session) return;
     const detection = detectTerminalRequirement(snapshot.content);
     const nextRequirement: SurfaceRequirement = detection ? 'terminal-required' : 'terminal-available';
-    const nextChatState = deriveChatState(session, detection?.reason);
     const transcriptResult = detection ? null : await this.transcriptReader.readAssistantMessage(session);
-    const transcriptContent = transcriptResult?.content ?? null;
+    const transcriptContent = shouldAcceptTranscriptResult(session, transcriptResult)
+      ? transcriptResult?.content ?? null
+      : null;
+    const nextChatState = deriveChatState(session, {
+      actionRequest: deriveActionRequest({
+        detectionReason: detection?.reason,
+        snapshot: snapshot.content,
+        transcriptContent,
+      }),
+      reason: detection?.reason,
+    });
+    const terminalAssistantContent = deriveTerminalAssistantFallback(session, snapshot.content);
     const assistantContent =
-      transcriptContent || (detection ? '' : deriveAssistantContent(snapshot.content, session.chatState?.lastPrompt));
+      transcriptContent || (detection ? '' : terminalAssistantContent);
 
     if (
       nextRequirement !== session.surfaceRequirement ||
       nextChatState.phase !== session.chatState?.phase ||
-      nextChatState.terminalRequiredReason !== session.chatState?.terminalRequiredReason
+      nextChatState.terminalRequiredReason !== session.chatState?.terminalRequiredReason ||
+      nextChatState.actionRequest?.id !== session.chatState?.actionRequest?.id
     ) {
       await this.sessionStore.updateSession(sessionId, {
         chatState: nextChatState,
@@ -130,10 +145,12 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     }
 
     if (!assistantContent) return;
-    await this.upsertAssistantMessage(session, assistantContent);
+    await this.upsertAssistantMessage(sessionId, assistantContent);
   }
 
-  private async upsertAssistantMessage(session: Session, content: string) {
+  private async upsertAssistantMessage(sessionId: string, content: string) {
+    const session = await this.sessionStore.getSession(sessionId);
+    if (!session) return;
     const currentMessage = session.chatState?.lastAssistantMessageId
       ? session.messages.find((message) => message.id === session.chatState?.lastAssistantMessageId)
       : undefined;
@@ -149,6 +166,7 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
         timestamp,
       };
       const chatState: ChatState = {
+        actionRequest: session.chatState?.actionRequest,
         lastAssistantMessageId: message.id,
         lastPrompt: session.chatState?.lastPrompt,
         phase: 'streaming-assistant',
@@ -160,22 +178,35 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
         messages: [...session.messages, message],
       });
       this.emit('chat:message', session.id, message);
+      this.emit('surface:update', session.id, {
+        chatState,
+        mode: session.surfaceMode,
+        reason: chatState.terminalRequiredReason,
+        requirement: session.surfaceRequirement,
+      });
       this.scheduleAssistantFinalize(session.id);
       return;
     }
 
+    const chatState: ChatState = {
+      ...session.chatState,
+      phase: 'streaming-assistant',
+      transcriptUpdatedAt: timestamp,
+    };
     await this.sessionStore.updateSession(session.id, {
-      chatState: {
-        ...session.chatState,
-        phase: 'streaming-assistant',
-        transcriptUpdatedAt: timestamp,
-      },
+      chatState,
       lastMessageAt: timestamp,
       messages: session.messages.map((message) =>
         message.id === currentMessage.id ? { ...message, content, isStreaming: true, timestamp } : message
       ),
     });
     this.emit('chat:update', session.id, currentMessage.id, content, true);
+    this.emit('surface:update', session.id, {
+      chatState,
+      mode: session.surfaceMode,
+      reason: chatState.terminalRequiredReason,
+      requirement: session.surfaceRequirement,
+    });
     this.scheduleAssistantFinalize(session.id);
   }
 
@@ -196,12 +227,42 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
 
   private async syncBootstrapTranscript(session: Session) {
     const transcriptResult = await this.transcriptReader.readAssistantMessage(session).catch(() => null);
-    const transcriptContent = transcriptResult?.content?.trim();
+    const transcriptContent = shouldAcceptTranscriptResult(session, transcriptResult)
+      ? transcriptResult?.content?.trim()
+      : undefined;
     if (!transcriptContent) return session;
 
-    const lastAssistantMessageId =
-      session.chatState?.lastAssistantMessageId ??
-      [...session.messages].reverse().find((message) => message.role === 'assistant')?.id;
+    const trackedAssistantMessageId = session.chatState?.lastAssistantMessageId;
+    const latestAssistant = [...session.messages].reverse().find((message) => message.role === 'assistant');
+    const isAwaitingFreshAssistant =
+      !trackedAssistantMessageId &&
+      (session.chatState?.phase === 'awaiting-assistant' || session.chatState?.phase === 'streaming-assistant');
+
+    if (isAwaitingFreshAssistant && latestAssistant?.content !== transcriptContent) {
+      const timestamp = new Date();
+      const message: Message = {
+        content: transcriptContent,
+        id: uuidv4(),
+        isStreaming: false,
+        role: 'assistant',
+        timestamp,
+      };
+
+      return (
+        (await this.sessionStore.updateSession(session.id, {
+          chatState: {
+            ...session.chatState,
+            lastAssistantMessageId: message.id,
+            phase: session.chatState?.phase ?? 'idle',
+            transcriptUpdatedAt: timestamp,
+          },
+          lastMessageAt: timestamp,
+          messages: [...session.messages, message],
+        })) ?? session
+      );
+    }
+
+    const lastAssistantMessageId = trackedAssistantMessageId ?? latestAssistant?.id;
     if (!lastAssistantMessageId) return session;
 
     const currentMessage = session.messages.find((message) => message.id === lastAssistantMessageId);
@@ -235,23 +296,68 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     if (!session || !messageId) return;
     const message = session.messages.find((entry) => entry.id === messageId);
     if (!message?.isStreaming) return;
+    const chatState: ChatState = {
+      ...session.chatState,
+      phase: session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle',
+    };
     await this.sessionStore.updateSession(sessionId, {
-      chatState: {
-        ...session.chatState,
-        phase: session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle',
-      },
+      chatState,
       messages: session.messages.map((entry) =>
         entry.id === messageId ? { ...entry, isStreaming: false } : entry
       ),
     });
     this.emit('chat:update', sessionId, messageId, message.content, false);
+    this.emit('surface:update', sessionId, {
+      chatState,
+      mode: session.surfaceMode,
+      reason: chatState.terminalRequiredReason,
+      requirement: session.surfaceRequirement,
+    });
   }
 }
 
-function deriveChatState(session: Session, reason: string | undefined): ChatState {
+function shouldAcceptTranscriptResult(
+  session: Session,
+  transcriptResult: { content: string | null; updatedAt?: Date } | null
+) {
+  if (!transcriptResult?.content?.trim()) return false;
+
+  const transcriptUpdatedAt = transcriptResult.updatedAt?.getTime();
+  const sessionTranscriptUpdatedAt = session.chatState?.transcriptUpdatedAt?.getTime();
+
+  if (!transcriptUpdatedAt || !sessionTranscriptUpdatedAt) {
+    return true;
+  }
+
+  return transcriptUpdatedAt > sessionTranscriptUpdatedAt;
+}
+
+function deriveTerminalAssistantFallback(session: Session, snapshotContent: string) {
+  if (session.providerRuntime?.provider === 'claude') {
+    return deriveClaudeTerminalAssistantContent(snapshotContent, session.chatState?.lastPrompt);
+  }
+
+  if (session.providerRuntime?.provider === 'codex') {
+    return '';
+  }
+
+  return deriveAssistantContent(snapshotContent, session.chatState?.lastPrompt);
+}
+
+function deriveChatState(
+  session: Session,
+  {
+    actionRequest,
+    reason,
+  }: {
+    actionRequest?: ChatActionRequest;
+    reason: string | undefined;
+  }
+): ChatState {
   if (reason) {
     return {
       ...session.chatState,
+      actionRequest,
       phase: 'terminal-required',
       terminalRequiredReason: reason,
       transcriptUpdatedAt: new Date(),
@@ -259,9 +365,26 @@ function deriveChatState(session: Session, reason: string | undefined): ChatStat
   }
   return {
     ...session.chatState,
+    actionRequest: undefined,
     phase: session.chatState?.phase === 'terminal-required' ? 'idle' : (session.chatState?.phase ?? 'idle'),
     terminalRequiredReason: undefined,
+    transcriptUpdatedAt: new Date(),
   };
+}
+
+function deriveActionRequest({
+  detectionReason,
+  snapshot,
+  transcriptContent,
+}: {
+  detectionReason?: string;
+  snapshot: string;
+  transcriptContent: string | null;
+}) {
+  const transcriptRequest = transcriptContent ? extractActionRequest(transcriptContent, 'transcript') : undefined;
+  if (transcriptRequest) return transcriptRequest;
+  if (!detectionReason) return undefined;
+  return extractActionRequest(snapshot, 'terminal');
 }
 
 function deriveAssistantContent(content: string, lastPrompt: string | undefined) {
@@ -280,6 +403,68 @@ function deriveAssistantContent(content: string, lastPrompt: string | undefined)
 
   const text = candidateLines.join('\n').trim();
   return text && text !== lastPrompt?.trim() ? text : '';
+}
+
+function deriveClaudeTerminalAssistantContent(content: string, lastPrompt: string | undefined) {
+  if (!lastPrompt?.trim()) return '';
+
+  const lines = sanitizeTerminalLines(content);
+  const anchorIndex = findLastPromptLine(lines, lastPrompt.trim());
+  if (anchorIndex < 0) return '';
+
+  const candidateLines = lines.slice(anchorIndex + 1).map((line) => line.trim()).filter(Boolean);
+  let answerLines: string[] = [];
+  let collecting = false;
+
+  for (const line of candidateLines) {
+    if (/^❯\s/.test(line) || /^bruk@/.test(line) || /^current:/.test(line) || isTerminalDividerLine(line)) {
+      break;
+    }
+
+    if (/^●\s+/.test(line)) {
+      const next = line.replace(/^●\s+/, '').trim();
+      if (!next || isClaudeToolInvocation(next)) {
+        collecting = false;
+        answerLines = [];
+        continue;
+      }
+      collecting = true;
+      answerLines = [next];
+      continue;
+    }
+
+    if (collecting) {
+      if (isClaudeMetaLine(line)) {
+        break;
+      }
+      answerLines.push(line);
+    }
+  }
+
+  return answerLines.join('\n').trim();
+}
+
+function sanitizeTerminalLines(content: string) {
+  return sanitizeOutput(content)
+    .split('\n')
+    .map((line) => line.trimEnd());
+}
+
+function isClaudeToolInvocation(line: string) {
+  return /^[A-Z][A-Za-z0-9_-]*\(/.test(line);
+}
+
+function isClaudeMetaLine(line: string) {
+  return (
+    /^∴\s/.test(line) ||
+    /^⎿/.test(line) ||
+    /^[-•]\s/.test(line) ||
+    /^Status:/.test(line)
+  );
+}
+
+function isTerminalDividerLine(line: string) {
+  return /^[\u2500-\u257f─━]{10,}$/.test(line);
 }
 
 /**
