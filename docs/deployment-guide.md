@@ -1,12 +1,14 @@
 # Hướng dẫn chạy và triển khai
 
+Tài liệu này dành cho người muốn **chạy Codeject ổn định** trên máy cá nhân hoặc môi trường production đơn giản. Nếu bạn chỉ cần chạy thử lần đầu, xem `docs/getting-started.md` là đủ.
+
 ## Phát triển local
 
 Yêu cầu:
 
-- Node.js và npm tương thích với `packageManager`
-- `tmux`
-- `cloudflared` nếu muốn thử remote access
+- Node.js và npm tương thích với `packageManager`.
+- `tmux`.
+- `cloudflared` nếu muốn thử remote access.
 
 Lệnh cơ bản:
 
@@ -33,7 +35,7 @@ File mẫu:
 
 - `.env.example`
 
-Bien ho tro:
+Biến hỗ trợ:
 
 - `PORT`
 - `HOST`
@@ -46,16 +48,16 @@ Bien ho tro:
 
 ## Remote access
 
-Remote access đã có sẵn thông qua `cloudflared`.
+Remote access được cung cấp thông qua `cloudflared`.
 
 Điều kiện:
 
-- host phải cài `cloudflared`
-- request không local phải dùng bearer key
-- QR chỉ chứa public URL, không chứa secret
+- Host phải cài `cloudflared`.
+- Request không local phải dùng bearer key.
+- QR chỉ chứa public URL, không chứa secret.
 
 ## Ghi chú vận hành
 
-- production entrypoint là server Express trong `packages/server`
-- frontend static được phục vụ từ `packages/web/out`
-- mỗi session ứng dụng sở hữu một `tmux` runtime riêng
+- Production entrypoint là server Express trong `packages/server`.
+- Frontend static được phục vụ từ `packages/web/out`.
+- Mỗi session ứng dụng sở hữu một `tmux` runtime riêng.

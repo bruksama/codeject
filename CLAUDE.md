@@ -109,10 +109,14 @@ Server only:
 
 ## Documentation
 
-Use `docs/` as the repository documentation source of truth.
+Use `docs/` as the repository documentation source of truth for humans.
 
-When implementation changes phase status or architecture, update:
+- Human-facing docs (Vietnamese) live in `docs/*.md` (for example: `docs/getting-started.md`, `docs/system-architecture.md`, `docs/project-roadmap.md`).
+- LLM-facing compact docs live in `docs/llm/*.md` (for example: `docs/llm/project-summary.md`, `docs/llm/architecture.md`, `docs/llm/api-reference.md`).
 
+When implementation changes phase status or architecture, update at least:
+
+- `README.md`
 - `docs/project-roadmap.md`
 - `docs/system-architecture.md`
-- other affected docs as needed
+- any directly affected doc (human and LLM variants)

@@ -92,10 +92,14 @@ Server:
 
 ## Documentation Rules
 
-Use `docs/` as source of truth.
+Use `docs/` as the source of truth.
+
+- Human-facing docs live in `docs/*.md` (for example: `docs/getting-started.md`, `docs/system-architecture.md`, `docs/project-roadmap.md`).
+- LLM-facing compact docs for agents live in `docs/llm/*.md` (for example: `docs/llm/project-summary.md`, `docs/llm/architecture.md`, `docs/llm/api-reference.md`).
 
 When implementation changes architecture or progress, update:
 
+- `README.md`
 - `docs/project-roadmap.md`
 - `docs/system-architecture.md`
-- any directly affected doc
+- any directly affected doc (human and LLM variants)

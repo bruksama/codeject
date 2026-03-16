@@ -1,5 +1,7 @@
 # Kiến trúc hệ thống
 
+Tài liệu này mô tả **các khối chính** trong Codeject và cách chúng nói chuyện với nhau. Mục tiêu là giúp bạn sửa code hoặc debug mà không cần đọc toàn bộ codebase.
+
 ## Mô hình runtime
 
 Production dùng một process Node.js để chạy Express và WebSocket.
@@ -55,6 +57,14 @@ Frontend được build thành static export và được backend phục vụ tr
 - `AppSettings`
 - `TerminalRuntime`
 - `TerminalSnapshot`
+
+### Bundled CLI defaults
+
+- `Claude Code`
+- `OpenAI Codex`
+- `OpenCode`
+
+Known bundled programs dùng local static assets trong web app. Custom programs vẫn giữ string icon compatibility để fallback về emoji/text nếu cần.
 
 ## Nguồn sự thật của dữ liệu
 
