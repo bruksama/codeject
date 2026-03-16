@@ -30,6 +30,21 @@ Before implementing:
 2. Read the relevant phase file in `plans/260315-1935-cli-mobile-webapp/`
 3. Inspect the files you will modify
 
+## Claude Workflow
+
+For Claude sessions in this repository, use this flow and do not substitute a different primary command when the task matches one of these categories.
+
+1. First of all, use `/ck:ck-help` to find the most suitable skill and verify the workflow.
+2. Brainstorming must use `/ck:brainstorm`.
+3. Planning must use `/ck:plan`.
+4. Implementing must use `/ck:cook`.
+5. Debugging and root-cause investigation must use `/ck:debug`.
+6. Fixing a bug after debugging must use `/ck:fix` and keep `/ck:debug` active for root-cause discipline.
+7. Browser automation, browser verification, and browser-based investigation must use `/ck:agent-browser`.
+8. Git tasks must use `/ck:git`.
+
+If a task spans multiple phases, follow the sequence above instead of jumping straight to implementation or fixes.
+
 ## Repository Rules
 
 - Follow the current phase plan unless the user explicitly changes direction
@@ -102,4 +117,3 @@ When implementation changes phase status or architecture, update:
 - `docs/project-roadmap.md`
 - `docs/system-architecture.md`
 - other affected docs as needed
-
