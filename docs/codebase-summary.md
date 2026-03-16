@@ -1,92 +1,85 @@
-# Codebase Summary
+# Tóm tắt codebase
 
-## Summary
+## Tổng quan
 
-This repository is an npm workspace monorepo with three packages:
+Repository này là một monorepo npm workspace gồm 3 package:
 
-- `packages/web`: Next.js app router frontend
-- `packages/server`: Express backend with REST and WebSocket entrypoints
+- `packages/web`: frontend Next.js
+- `packages/server`: backend Express + WebSocket
 - `packages/shared`: shared TypeScript types
 
-The repo currently centers on a complete local Phase 4 implementation: tmux-backed runtimes, hybrid chat-terminal UX, backend-backed session/config CRUD, and provider transcript parsing for cleaner chat bootstrap.
+Hệ thống hiện tại đã hoàn thiện luồng sử dụng chính: tạo session, gán CLI program, xem chat, mở terminal, lưu trạng thái, và truy cập từ xa qua tunnel.
 
-## Package Summary
+## `packages/web`
 
-### `packages/web`
+Vai trò:
 
-Purpose:
+- hiển thị session list
+- khởi tạo session mới
+- chat-first session surface
+- terminal fallback
+- settings va remote access controls
 
-- mobile UI
-- session list, chat surface, and terminal surface
-- settings and CLI program management screens
-
-Important files:
+Thành phần quan trọng:
 
 - `src/app/chat-interface/page.tsx`
-- `src/app/cli-program-editor/page.tsx`
 - `src/app/new-session-setup/page.tsx`
-- `src/components/terminal/terminal-viewport.tsx`
-- `src/hooks/use-hybrid-session.ts`
+- `src/app/sessions-list/page.tsx`
 - `src/app/settings/page.tsx`
+- `src/components/chat/*`
+- `src/components/terminal/*`
+- `src/hooks/use-hybrid-session.ts`
 - `src/stores/useAppStore.ts`
-- `eslint.config.mjs`
 
-Current state:
+Trạng thái hiện tại:
 
-- fully styled UI
-- static export enabled
-- session list, settings, and CLI program flows are wired to the backend
-- chat route runs in hybrid mode with WebSocket-driven chat, surface, and terminal state
-- chat prompt submission now uses an optimistic local user/pending-assistant pair so the inline 3-dot state appears immediately instead of waiting for websocket roundtrips
-- terminal viewport uses xterm with mobile key strip and guarded resize handling
+- chat screen đã được thu gọn để hiện nhiều nội dung hơn
+- composer mặc định nằm trên một hàng, mở rộng khi focus
+- transcript tự động xuống cuối khi mở session dài
+- có nút quay về tin nhắn mới nhất khi người dùng cuộn lên
+- terminal vẫn có mặt đầy đủ cho input trực tiếp
 
-### `packages/server`
+## `packages/server`
 
-Purpose:
+Vai trò:
 
-- serve static frontend
-- expose REST API
-- manage auth and persistence
-- own tmux runtime lifecycle
-- accept WebSocket upgrades for chat and terminal streaming
+- phục vụ frontend static
+- cung cấp REST API
+- quản lý auth và persistence
+- quản lý `tmux` runtime cho từng session
+- đồng bộ chat và terminal qua WebSocket
+- quản lý lifecycle của Cloudflare Tunnel
 
-Important files:
+Thành phần quan trọng:
 
 - `src/index.ts`
+- `src/routes/*`
 - `src/services/session-store.ts`
 - `src/services/config-store.ts`
-- `src/services/auth-service.ts`
 - `src/services/terminal-session-manager.ts`
+- `src/services/tmux-bridge.ts`
 - `src/services/session-supervisor.ts`
 - `src/services/provider-transcript-reader.ts`
-- `src/routes/*`
+- `src/services/tunnel-manager.ts`
 - `src/websocket/websocket-handler.ts`
 
-Current state:
+Trạng thái hiện tại:
 
-- phase 4 complete
-- session/config persistence implemented
-- tmux-backed runtime management implemented
-- chat transcript bootstrap prefers Claude/Codex provider transcripts when available
-- session supervisor now reserves a fresh assistant placeholder per prompt and blocks stale carry-over from the previous settled assistant answer
-- reconnect and stale-pane recovery paths are hardened to avoid server crashes
+- session và config đã lưu xuống đĩa
+- transcript reader ưu tiên transcript của Claude/Codex nếu tìm thấy
+- session supervisor tạo pending assistant row và tránh stale assistant carry-over
+- Codex transcript sync đã được làm mới an toàn hơn khi rollout file thay đổi
+- stale pane và reconnect không còn dễ làm sập server
 
-### `packages/shared`
+## `packages/shared`
 
-Purpose:
+Vai trò:
 
-- shared interfaces for sessions, messages, CLI programs, hybrid chat state, terminal runtime, and settings
+- chia sẻ các type như `Session`, `Message`, `ChatState`, `CliProgram`, `AppSettings`, `TerminalRuntime`, `TerminalSnapshot`
 
-Important files:
+## Điểm cần để ý khi sửa tiếp
 
-- `src/types.ts`
-
-## Largest Source Files
-
-- `packages/web/src/app/settings/page.tsx`
-- `packages/web/src/app/cli-program-editor/page.tsx`
-- `packages/web/src/app/chat-interface/page.tsx`
-- `packages/web/src/app/new-session-setup/page.tsx`
-- `packages/web/src/app/sessions-list/page.tsx`
-
-These are the best candidates for future modularization if behavior keeps growing.
+- `packages/web/src/app/settings/page.tsx` còn khá lớn
+- `packages/web/src/app/cli-program-editor/page.tsx` còn khá lớn
+- transcript chat vẫn là lớp UX suy ra, không phải runtime source of truth
+- terminal snapshot hiện vẫn refresh theo toàn bộ content, chưa diff stream

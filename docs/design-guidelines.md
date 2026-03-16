@@ -1,29 +1,35 @@
-# Design Guidelines
+# Hướng dẫn thiết kế
 
-## Current Visual Direction
+## Định hướng giao diện
 
-- dark glassmorphism UI
-- touch-first spacing and hit areas
-- mobile bottom navigation
-- high-contrast status indicators
+- mobile-first
+- dark glass surface
+- thao tác bằng một tay dễ tiếp cận
+- ưu tiên nội dung chính hơn là trang trí
 
-## Preserve
+## Nguyên tắc UI
 
-- existing route structure
-- existing visual identity in imported rocket.dev UI
-- mobile-first interaction model
+- chat phải đọc được ngay trên màn hình điện thoại
+- terminal chỉ hiện khi người dùng cần thao tác trực tiếp
+- header và composer phải gọn để nhường chỗ cho transcript
+- các trạng thái kết nối, lỗi, streaming phải dễ nhận ra nhưng không lấn át
 
-## Avoid
+## Cần giữ
 
-- dropping in a conflicting component library
-- redesigning screens during backend-focused phases
-- introducing desktop-first layout assumptions
+- route structure hiện có
+- bottom navigation và luồng di chuyển hiện tại
+- visual language từ giao diện đã import
+- sự tách biệt rõ giữa chat surface và terminal surface
 
-## Future Integration Guidance
+## Cần tránh
 
-When wiring backend behavior:
+- đưa thêm một design system khác vào giữa dự án
+- quay lại layout desktop-first
+- dùng quá nhiều khung, viền, và padding làm mất không gian đọc
+- biến terminal thành giao diện "giả chat"
 
-- keep loading and error states visually subtle
-- preserve the chat reading flow
-- avoid terminal-looking raw UI unless explicitly needed
+## Hướng dẫn cho các lần polish sau
 
+- mọi thay đổi UI phải kiểm tra trên màn hình nhỏ
+- nếu có animation, phải có ý nghĩa và nhẹ
+- ưu tiên readability, tap target, và scroll behavior

@@ -1,49 +1,65 @@
-# Project Overview PDR
+# Tổng quan sản phẩm
 
-## Product
+## Sản phẩm là gì
 
-Codeject is a phone-friendly interface for controlling local CLI coding assistants through one backend server. The user can create sessions, connect them to CLI programs, switch between chat-first and terminal views, and eventually expose the app remotely through a tunnel.
+Codeject là một ứng dụng web mobile-first để điều khiển các CLI coding assistant đang chạy trên máy tính cá nhân. Người dùng có thể tạo session, gán session với chương trình CLI, xem transcript dạng chat và chuyển sang terminal khi cần thao tác trực tiếp.
 
-## Problem
+## Vấn đề giải quyết
 
-Local coding CLIs are powerful but awkward to monitor or drive from a phone. The project solves that by putting a thin mobile UI over a local backend that manages sessions and terminal processes.
+CLI coding assistant rất mạnh nhưng khó theo dõi trên điện thoại. Codeject đặt một lớp giao diện gọn nhẹ lên trên backend local để người dùng:
 
-## Users
+- xem session đang chạy từ điện thoại
+- gửi prompt nhanh bằng chat surface
+- quay lại terminal để xử lý approval, menu, hay TUI phức tạp
+- mở remote access mà không phải mở nhiều cổng
 
-- solo developer running local coding agents
-- developer monitoring or nudging long-running CLI sessions from a phone
-- user wanting one local UI for multiple CLIs such as Claude Code, Codex, and Aider
+## Người dùng mục tiêu
 
-## Product Requirements
+- lập trình viên cá nhân dùng Claude Code, Codex, hoặc CLI tương tự
+- người đang giám sát một session dài và không muốn ngồi trước máy liên tục
+- người muốn một giao diện chung cho nhiều công cụ CLI
 
-- mobile-first UI
-- single local backend port
-- session persistence across reloads
-- support multiple CLI program definitions
-- real-time output streaming
-- low-friction remote access path
+## Giá trị chính
 
-## Technical Requirements
+- một backend duy nhất
+- một UI tối ưu cho màn hình điện thoại
+- session bền vững qua reload và reconnect
+- terminal runtime được giữ sống bằng `tmux`
+- remote access có sẵn nếu host có `cloudflared`
 
-- static frontend export served by backend
-- authenticated non-local API and WS access
-- disk-backed session/config persistence
-- tmux-backed persistent runtime lifecycle
-- shared type definitions between frontend and backend
+## Yêu cầu chức năng
 
-## Current Delivery State
+- tạo, sửa, xóa session
+- quản lý danh sách chương trình CLI
+- stream nội dung session qua WebSocket
+- đổi qua lại giữa chat và terminal
+- lưu trạng thái xuống đĩa
+- xác thực bearer cho truy cập không local
 
-- phase 1 complete
-- phase 2 complete
-- phase 3 complete
-- phase 4 complete
-- backend manages persistent tmux runtimes for Claude Code, Codex, and generic CLIs
-- frontend uses real backend sessions, config APIs, and hybrid WebSocket flows
-- chat bootstrap can derive cleaner assistant messages from provider transcripts instead of showing raw TUI output when a transcript is available
+## Yêu cầu kỹ thuật
 
-## Non-Goals For Current State
+- frontend static được Express phục vụ
+- backend REST + WebSocket trong cùng một process Node.js
+- runtime terminal dựa trên `tmux`
+- shared types dùng chung giữa frontend và backend
+- dữ liệu local nằm trong `~/.codeject`
 
-- multi-user auth model
-- cloud-hosted SaaS deployment
-- SSR-heavy frontend behavior
-- remote tunnel flow before phase 5
+## Trạng thái hiện tại
+
+Ứng dụng đã sẵn sàng để sử dụng.
+
+Đã hoàn thành:
+
+- monorepo và workspace
+- backend route, auth, persistence, WebSocket
+- `tmux` terminal bridge và reconnect-safe runtime ownership
+- hybrid chat-terminal UX
+- transcript parser cho Claude và Codex
+- tunnel lifecycle và remote access controls
+
+## Phi mục tiêu hiện tại
+
+- mô hình multi-user
+- SaaS cloud-hosted
+- SSR phức tạp
+- thay terminal bằng một chat model "chuẩn" hoàn toàn

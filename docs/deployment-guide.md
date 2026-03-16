@@ -1,57 +1,61 @@
-# Deployment Guide
+# Hướng dẫn chạy và triển khai
 
-## Local Development
+## Phát triển local
 
-Requirements:
+Yêu cầu:
 
-- Node.js matching `packageManager` expectations
-- npm
+- Node.js và npm tương thích với `packageManager`
 - `tmux`
+- `cloudflared` nếu muốn thử remote access
 
-Commands:
+Lệnh cơ bản:
 
 - `npm run dev`
 - `npm run lint`
 - `npm run type-check`
 - `npm run build`
 
-## Local Production Run
+## Chạy production local
 
 Build:
 
 - `npm run build`
 
-Start:
+Run:
 
 - `npm start`
 
-The production server listens on `PORT` or defaults to `3500`.
+Mặc định server lắng nghe ở `PORT` hoặc `3500`.
 
-Current local production scope:
+## Biến môi trường
 
-- phases 1 to 4 are implemented locally
-- hybrid chat and terminal surfaces are available over the same WebSocket session
-- provider transcript parsing improves chat bootstrap for Claude and Codex sessions when local transcript files exist
-
-## Environment
-
-Current env file:
+File mẫu:
 
 - `.env.example`
 
-Supported variables:
+Bien ho tro:
 
 - `PORT`
 - `HOST`
-- `CODEJECT_HOME` optional override for `~/.codeject`
+- `CODEJECT_HOME` để đổi vị trí mặc định của `~/.codeject`
 
-## Persistence
-
-The app writes local state under:
+## Lưu trữ dữ liệu
 
 - `~/.codeject/config.json`
-- `~/.codeject/sessions/`
+- `~/.codeject/sessions/*.json`
 
-## Remote Access
+## Remote access
 
-Remote tunnel deployment is planned for phase 5 and is not production-ready yet.
+Remote access đã có sẵn thông qua `cloudflared`.
+
+Điều kiện:
+
+- host phải cài `cloudflared`
+- request không local phải dùng bearer key
+- QR chỉ chứa public URL, không chứa secret
+
+## Ghi chú vận hành
+
+- production entrypoint là server Express trong `packages/server`
+- frontend static được phục vụ từ `packages/web/out`
+- mỗi session ứng dụng sở hữu một `tmux` runtime riêng

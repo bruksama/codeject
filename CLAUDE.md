@@ -16,18 +16,17 @@ Current phase status:
 
 - Phase 1: complete
 - Phase 2: complete
-- Phase 3: next
-
-Primary plan:
-
-- `plans/260315-1935-cli-mobile-webapp/plan.md`
+- Phase 3: complete
+- Phase 4: complete
+- Phase 5: complete
+- Current focus: cleanup, stabilization, and documentation updates
 
 ## Required Reading
 
 Before implementing:
 
 1. Read `README.md`
-2. Read the relevant phase file in `plans/260315-1935-cli-mobile-webapp/`
+2. Read the relevant docs in `docs/`
 3. Inspect the files you will modify
 
 ## Claude Workflow
@@ -77,7 +76,7 @@ Auth model:
 - Preserve the imported mobile UI and visual language
 - Keep App Router conventions
 - Maintain static export compatibility
-- Treat the Zustand store as temporary integration scaffolding until phase 4 replaces mocks
+- Treat the Zustand store as part of the current runtime, not as temporary mock scaffolding
 
 ## Backend Rules
 

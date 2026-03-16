@@ -1,79 +1,60 @@
-# Project Roadmap
+# Lộ trình dự án
 
-## Status
+## Trạng thái tổng thể
 
-- Phase 1: complete
-- Phase 2: complete
-- Phase 3: complete
-- Phase 4: complete
-- Phase 5: complete
-- Terminal remote tmux bridge: complete
-- Hybrid chat-terminal supervisor: complete
+Ứng dụng đã sẵn sàng để sử dụng.
 
-## Phase 1
+Tất cả các phase xây dựng chính đã hoàn thành:
 
-Completed:
+- Phase 1: monorepo va frontend import
+- Phase 2: backend core, auth, persistence, WebSocket
+- Phase 3: `tmux` terminal bridge
+- Phase 4: hybrid chat-terminal experience
+- Phase 5: remote tunnel va remote auth flow
 
-- workspace monorepo setup
-- frontend import
-- shared types package
-- minimal server package
-- root build/dev/start scripts
+## Đã giao
 
-## Phase 2
+### Nền tảng
 
-Completed:
+- npm workspace monorepo
+- package `web`, `server`, `shared`
+- root scripts cho `dev`, `build`, `lint`, `type-check`, `start`
 
-- backend route structure
-- auth service and middleware
-- session persistence
-- config persistence
-- WebSocket handshake and heartbeat
+### Backend
 
-## Phase 3
+- route cho health, auth, sessions, config, tunnel
+- bearer auth cho request không local
+- lưu config và session xuống đĩa
+- `tmux` runtime management bền vững qua reconnect
+- tunnel manager cho `cloudflared`
 
-Completed:
+### Frontend
 
-- tmux-backed terminal session manager with reconnect-safe runtime ownership
-- CLI adapters reused for launch command construction
-- session persistence for terminal metadata and terminal size
-- missing-tmux failure path with actionable error messaging
-- tmux session cleanup on stale-session removal and explicit delete
+- session list, new session, settings, CLI program editor
+- hybrid chat surface va terminal fallback
+- mobile terminal controls
+- compact chat composer và transcript scroll behavior tốt hơn
 
-## Phase 4
+### Transcript và supervisor
 
-Completed:
+- ưu tiên transcript của Claude/Codex nếu có
+- fallback về terminal snapshot khi cần
+- pending assistant indicator inline
+- simple confirm va numbered single-select action cards
+- Codex transcript refresh an toàn hơn khi file rollout thay đổi
 
-- frontend store now hydrates sessions and CLI programs from the backend
-- chat route now defaults to a derived transcript view while keeping terminal one tap away
-- new session flow creates real sessions on the server
-- CLI program editor persists CRUD changes through backend config routes
-- settings page uses auth/config APIs and keeps tunnel control deferred to phase 5
-- websocket reconnect restores the latest tmux snapshot instead of replaying transcript messages
-- mobile terminal controls now provide enter, backspace, ctrl, escape, tab, and arrow keys
-- conservative backend detection can mark sessions as terminal-required for approvals and menus
-- hybrid websocket frames now carry chat, surface, and terminal state together
-- provider transcript readers now resolve Claude and Codex local transcript files when available
-- chat bootstrap now prefers parsed provider messages over raw tmux TUI dumps
-- terminal reconnect now clears stale pane metadata and recreates tmux sessions instead of crashing on missing panes
-- websocket terminal command failures now surface as runtime errors instead of being mislabeled as invalid frames
-- chat prompt flow now creates an inline pending assistant row with the existing 3-dot indicator instead of reusing stale prior assistant content
-- hybrid chat can now surface simple confirm and numbered single-select action cards with one-tap terminal fallback
+## Giai đoạn tiếp theo
 
-## Phase 5
+Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 
-Completed:
+- dọn dẹp code
+- giảm kích thước các file giao diện lớn
+- cập nhật và đơn giản hóa tài liệu
+- hardening thêm cho browser/device thực tế nếu cần
 
-- backend-owned `cloudflared` tunnel manager with explicit `inactive -> starting -> active -> stopping -> error` lifecycle
-- stale managed tunnel PID cleanup on startup and managed shutdown on `SIGINT` / `SIGTERM`
-- proxy-aware auth checks so tunneled REST and WebSocket traffic no longer bypass local-only auth rules
-- tunnel routes for status, start, stop, and restart under `/api/tunnel`
-- settings page remote access controls, public URL copy, and real QR rendering for the tunnel URL only
-- device-local bearer key save flow so phone browsers can authenticate without embedding secrets in QR query params
+## Ranh giới hiện tại
 
-Delivered before tunnel work:
-
-- one persistent tmux runtime per app session
-- tmux pane history remains the source of truth for runtime content
-- derived chat transcript is rebuilt from websocket bootstrap plus supervisor updates
-- terminal remains the guaranteed recovery path when chat extraction is ambiguous
+- host vẫn cần `tmux`
+- remote access vẫn cần `cloudflared`
+- transcript chat vẫn là best-effort extraction
+- terminal vẫn là fallback path cuối cùng cho approval, menu, và TUI

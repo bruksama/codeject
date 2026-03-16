@@ -4,7 +4,7 @@ Instructions for Codex-style agents working in this repository.
 
 ## Mission
 
-Work from the current codebase state and current phase plan. Do not optimize for hypothetical future architecture over the code that exists today.
+Work from the current codebase state and maintained documentation. Do not optimize for hypothetical future architecture over the code that exists today.
 
 ## Project Layout
 
@@ -12,18 +12,13 @@ Work from the current codebase state and current phase plan. Do not optimize for
 - `packages/server`: Express backend
 - `packages/shared`: shared TypeScript types
 - `docs/`: project docs
-- `plans/`: implementation plans
-
-Primary active plan:
-
-- `plans/260315-1935-cli-mobile-webapp/plan.md`
 
 ## Startup Checklist
 
 Before coding:
 
 1. Read `README.md`
-2. Read the relevant phase file
+2. Read the relevant docs in `docs/`
 3. Inspect the touched files directly
 
 ## Codex Workflow
@@ -90,7 +85,10 @@ Server:
 
 - Phase 1 complete
 - Phase 2 complete
-- Phase 3 next: PTY manager, adapters, output bridge
+- Phase 3 complete
+- Phase 4 complete
+- Phase 5 complete
+- Current focus: cleanup, stabilization, and documentation updates
 
 ## Documentation Rules
 

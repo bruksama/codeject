@@ -1,53 +1,49 @@
-# System Architecture
+# Kiến trúc hệ thống
 
-## Runtime Model
+## Mô hình runtime
 
-Production uses a single Node.js process for Express and WebSocket handling.
+Production dùng một process Node.js để chạy Express và WebSocket.
 
 ```text
 Browser
   -> Express static files
-  -> REST API under /api/*
-  -> WebSocket under /ws/:sessionId
-  -> chat, surface, and terminal frames
+  -> REST API /api/*
+  -> WebSocket /ws/:sessionId
 
 Express + WebSocket
-  -> session store under ~/.codeject/sessions
-  -> tmux bridge for per-session runtime ownership
-  -> provider transcript readers for Claude/Codex message extraction
-  -> session supervisor for derived chat bootstrap and terminal-required detection
+  -> session store trong ~/.codeject/sessions
+  -> config store trong ~/.codeject/config.json
+  -> tmux runtime cho từng session
+  -> transcript reader cho Claude/Codex
+  -> session supervisor cho hybrid chat-terminal
+  -> tunnel manager cho cloudflared
 ```
 
-The frontend is built as a static export and served by the backend.
+Frontend được build thành static export và được backend phục vụ trực tiếp.
 
-## Components
+## Các thành phần chính
 
 ### Frontend
 
-- Next.js 16 app router
-- Zustand store for local UI state plus backend-hydrated sessions/config
-- mobile-focused chat-first, terminal fallback, and settings screens
-- REST API client for sessions, auth, and CLI program config
-- WebSocket client with reconnect and queued outbound chat, surface, and terminal frames
-- xterm terminal viewport plus mobile key strip and input bar
+- Next.js 16 App Router
+- Zustand store cho local UI state va backend-hydrated state
+- màn hình session list, new session, chat, terminal, settings
+- WebSocket client có reconnect
+- xterm viewport va mobile key strip
 
 ### Backend
 
 - Express 5 server
-- route modules for health, auth, sessions, and config
-- route modules for health, auth, sessions, config, and tunnel lifecycle
-- auth middleware that bypasses only real loopback clients and honors forwarded client IPs from proxies/tunnels
-- file-backed stores under `~/.codeject`
-- CLI adapters that still build the launch command for Claude Code, Codex, and generic shell programs
-- provider transcript parsers for Claude transcript `.jsonl` files and Codex rollout `.jsonl` files
-- tmux bridge service for session create, send-keys, resize, capture-pane, and kill-session
-- terminal session manager that maps app session IDs to tmux targets
-- tunnel manager that owns exactly one `cloudflared` child process, persists lifecycle metadata in config, clears stale managed PIDs on startup, and shuts the tunnel down on server exit
-- session supervisor that creates a pending assistant placeholder on prompt, prefers provider transcript content, falls back to sanitized tmux snapshots only when the current prompt can be anchored safely, derives conservative terminal-required signals, and emits high-confidence chat action requests for simple confirms and numbered selections
-- WebSocket upgrade handler with ping/pong heartbeat plus chat bootstrap/update, surface mode, and terminal init/snapshot/update frames
-- tmux runtimes stay alive across websocket disconnects until explicit delete or stale-session cleanup
-- websocket session sync that persists connection state, terminal size, and tmux target metadata
-- stale tmux pane/session errors now degrade to idle runtime state instead of crashing the server
+- route modules cho health, auth, sessions, config, tunnel
+- auth middleware chỉ bỏ qua auth cho loopback thực
+- file-backed store dưới `~/.codeject`
+- CLI adapters cho Claude Code, Codex, va generic shell
+- transcript parser cho Claude `.jsonl` va Codex rollout `.jsonl`
+- `tmux` bridge cho create, send-keys, resize, capture-pane, kill-session
+- terminal session manager map app session sang `tmux` target
+- session supervisor đồng bộ transcript, pending state, terminal-required signal, và action request
+- tunnel manager quản lý một process `cloudflared`
+- websocket handler cho chat, surface, terminal, heartbeat
 
 ### Shared
 
@@ -60,30 +56,38 @@ The frontend is built as a static export and served by the backend.
 - `TerminalRuntime`
 - `TerminalSnapshot`
 
+## Nguồn sự thật của dữ liệu
+
+- runtime source of truth: `tmux`
+- transcript chat: được suy ra để phục vụ UX
+- session/config persistence: lưu dưới `~/.codeject`
+
+Điều này có nghĩa là chat UI có thể gọn và thân thiện hơn, nhưng terminal vẫn là đường lui chính xác nhất khi transcript extraction mơ hồ.
+
 ## Persistence
 
 - config: `~/.codeject/config.json`
 - sessions: `~/.codeject/sessions/*.json`
-- terminal scrollback: tmux pane history only, not disk-backed JSON
-- derived transcript: stored in session JSON for UX bootstrap only
-- provider runtime metadata: stored in session JSON to cache matched transcript path and provider session id
+- terminal scrollback: nam trong `tmux` history
+- provider runtime metadata: luu provider, provider session id, transcript path
 
-## Auth Model
+## Auth
 
-- local requests allowed without bearer auth
-- non-local requests require bearer auth
-- stored API key is hashed on disk
-- remote QR flow shares only the public tunnel URL; the bearer key is stored separately per browser/device
+- request local: cho phép không cần bearer key
+- request không local: bắt buộc `Authorization: Bearer <key>`
+- API key được hash trước khi lưu
+- QR remote chỉ chia sẻ public URL
 
-## Current Gap
+## Remote access
 
-Frontend and backend now use a hybrid surface model over the same tmux runtime. Remote tunnel lifecycle now exists, but still depends on `cloudflared` being installed on the host.
+- remote access thông qua `cloudflared`
+- backend cung cấp `/api/tunnel` để xem trạng thái, start, stop, restart
+- proxy-aware auth kiểm tra IP thực khi đi qua tunnel
 
-Current constraints:
+## Ranh giới và hạn chế
 
-- host machine must have `tmux` installed
-- host machine must have `cloudflared` installed to enable remote access
-- snapshot mirroring currently refreshes whole terminal content instead of diff streaming
-- chat extraction is best-effort: provider transcript first, sanitized tmux fallback second
-- chat action extraction is intentionally narrow: yes/no confirms and numbered single-select only
-- terminal remains the fallback path for approvals, menus, and raw TUI recovery
+- host bắt buộc có `tmux`
+- remote access bắt buộc có `cloudflared`
+- terminal snapshot hiện vẫn cập nhật theo content đầy đủ, chưa diff stream
+- action extraction trong chat mới dừng ở mức đơn giản
+- terminal vẫn là fallback path cuối cùng

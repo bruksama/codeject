@@ -1,57 +1,67 @@
 # Codeject
 
-Mobile-first web app for controlling local CLI coding assistants from a phone.
+Giao diện web ưu tiên điện thoại để theo dõi và điều khiển các CLI coding assistant đang chạy trên máy local.
+
+## Trạng thái hiện tại
+
+Ứng dụng đã sẵn sàng để sử dụng.
+
+- Đã hoàn thành monorepo, frontend, backend, persistence, WebSocket, `tmux` runtime và remote tunnel
+- Chat là lớp UX thân thiện; terminal vẫn là đường lui và nguồn trạng thái thực tế
+- Giai đoạn hiện tại: dọn dẹp, ổn định hóa, cập nhật tài liệu
 
 ## Stack
 
 - Frontend: Next.js 16, React 19, Tailwind CSS 4, Zustand
-- Backend: Express 5, `ws`, `tmux`
+- Backend: Express 5, `ws`, `tmux`, `cloudflared`
 - Shared: TypeScript workspace package
 - Monorepo: npm workspaces + Turbo
 
-## Current Status
-
-- Phase 1 complete: monorepo setup, frontend import, shared package, static export
-- Phase 2 complete: backend core, REST API, auth, WebSocket handshake, disk persistence
-- Phase 3 complete: tmux-backed terminal bridge
-- Phase 4 complete: hybrid chat-first session experience over tmux runtime
-- Phase 5 complete: dev-safe remote tunnel flow
-
-## Workspace Layout
+## Cấu trúc thư mục
 
 ```text
 codeject/
 ├── packages/
-│   ├── web/       # Next.js mobile UI
-│   ├── server/    # Express + WebSocket backend
-│   └── shared/    # Shared TS types
-├── docs/          # Project documentation
-├── plans/         # Phase plans
+│   ├── web/       # UI mobile-first
+│   ├── server/    # Express + REST + WebSocket
+│   └── shared/    # Shared TypeScript types
+├── docs/          # Tài liệu chính thức
 ├── package.json
 └── turbo.json
 ```
 
-## Commands
+## Chức năng chính
 
-- `npm run dev` - run web and server in parallel
-- `npm run build` - build all workspaces
-- `npm run lint` - lint workspaces
-- `npm run type-check` - type-check workspaces
-- `npm start` - start production Express server on `:3500`
+- Tạo và quản lý nhiều session CLI
+- Chọn chương trình CLI như Claude Code, Codex hoặc generic shell
+- Xem chat-first surface và chuyển sang terminal khi cần
+- Lưu session và cấu hình dưới `~/.codeject`
+- Truy cập từ xa qua Cloudflare Tunnel
 
-## Runtime Notes
+## Lệnh phát triển
 
-- Production serves the static frontend from the Express server
-- Session data persists under `~/.codeject/sessions/`
-- Config data persists under `~/.codeject/config.json`
-- Local requests bypass auth; non-local requests require bearer auth
-- Each app session owns one persistent tmux runtime
-- Sessions default to chat view with one-tap terminal fallback
-- `tmux` must be installed on the host machine
-- Terminal scrollback lives in tmux history instead of session JSON files
-- Derived chat transcript is a UX layer, not the runtime source of truth
+- `npm run dev`: chạy web và server song song
+- `npm run lint`: lint toàn bộ workspace
+- `npm run type-check`: kiểm tra TypeScript
+- `npm run build`: build toàn bộ workspace
+- `npm start`: chạy production server mặc định ở `:3500`
 
-## API Surface
+## Yêu cầu môi trường
+
+- Node.js và npm tương thích với `packageManager`
+- `tmux` phải được cài trên máy host
+- `cloudflared` cần có sẵn nếu muốn bật remote tunnel
+
+## Runtime
+
+- Production dùng một process Node.js cho Express và WebSocket
+- Frontend static được phục vụ từ `packages/web/out`
+- API nằm dưới `/api/*`
+- WebSocket nằm dưới `/ws/:sessionId`
+- Session được lưu trong `~/.codeject/sessions/`
+- Cấu hình được lưu trong `~/.codeject/config.json`
+
+## API hiện có
 
 - `GET /api/health`
 - `GET /api/auth`
@@ -69,26 +79,48 @@ codeject/
 - `POST /api/tunnel/start`
 - `POST /api/tunnel/stop`
 - `POST /api/tunnel/restart`
-- `WS /ws/:sessionId`
 
-## WebSocket Protocol
+## WebSocket protocol
 
-- Client to server: `chat:prompt`, `surface:set-mode`, `terminal:init`, `terminal:input`, `terminal:key`, `terminal:resize`, `terminal:ping`
-- Server to client: `chat:bootstrap`, `chat:message`, `chat:update`, `surface:update`, `terminal:ready`, `terminal:snapshot`, `terminal:update`, `terminal:status`, `terminal:error`, `terminal:pong`
+Client -> server:
 
-## Frontend Integration
+- `chat:prompt`
+- `surface:set-mode`
+- `terminal:init`
+- `terminal:input`
+- `terminal:key`
+- `terminal:resize`
+- `terminal:ping`
 
-- Sessions list reads from `GET /api/sessions`
-- New session flow creates real backend sessions via `POST /api/sessions`
-- Chat route now opens in chat mode and keeps terminal as fallback over `WS /ws/:sessionId`
-- CLI program editor uses `/api/config/programs`
-- Settings page uses real auth/config endpoints; tunnel controls remain Phase 5
-- Settings page now uses real tunnel status/start/stop/restart endpoints
-- Remote QR shares only the public tunnel URL; bearer key stays separate
+Server -> client:
 
-## Dependency Policy
+- `chat:bootstrap`
+- `chat:message`
+- `chat:update`
+- `surface:update`
+- `terminal:ready`
+- `terminal:snapshot`
+- `terminal:update`
+- `terminal:status`
+- `terminal:error`
+- `terminal:pong`
 
-- Direct dependencies are exact-pinned
-- `package-lock.json` is part of the source of truth
-- Use latest stable intentionally, then re-pin
-- Do not run `npm install` unless dependency files changed
+## Ghi chú vận hành
+
+- Request local được bỏ qua bearer auth; request không local bắt buộc xác thực
+- Mỗi app session sở hữu một `tmux` runtime riêng
+- Terminal scrollback nằm trong history của `tmux`, không lưu JSON riêng
+- Transcript chat được suy ra từ provider transcript hoặc terminal output, không phải runtime source of truth
+- QR remote chỉ chia sẻ public URL; bearer key được lưu riêng trên từng thiết bị
+
+## Tài liệu
+
+Thư mục `docs/` là nguồn tài liệu chính thức:
+
+- `docs/project-overview-pdr.md`
+- `docs/code-standards.md`
+- `docs/codebase-summary.md`
+- `docs/design-guidelines.md`
+- `docs/deployment-guide.md`
+- `docs/system-architecture.md`
+- `docs/project-roadmap.md`
