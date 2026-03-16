@@ -32,9 +32,12 @@ export function ChatTranscript({
   programName = 'CLI',
 }: ChatTranscriptProps) {
   const visibleMessages = messages.filter(
-    (message) => !(message.role === 'assistant' && message.isStreaming)
+    (message) => !(message.role === 'assistant' && !message.isStreaming && !message.content.trim())
   );
   const hasMessages = visibleMessages.length > 0;
+  const hasInlineStreamingAssistant = visibleMessages.some(
+    (message) => message.role === 'assistant' && message.isStreaming && !message.content.trim()
+  );
   const showStreamingIndicator =
     chatState?.phase === 'awaiting-assistant' || chatState?.phase === 'streaming-assistant';
 
@@ -70,9 +73,17 @@ export function ChatTranscript({
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-2 pt-1">
-      {visibleMessages.map((message) => (
-        <ChatMessage key={message.id} message={message} programIcon={programIcon} />
-      ))}
+      {visibleMessages.map((message) =>
+        message.role === 'assistant' && message.isStreaming && !message.content.trim() ? (
+          <StreamingIndicator
+            key={message.id}
+            programIcon={programIcon}
+            programName={programName}
+          />
+        ) : (
+          <ChatMessage key={message.id} message={message} programIcon={programIcon} />
+        )
+      )}
       {chatState?.actionRequest && onOpenTerminal && onSubmitAction ? (
         <ChatActionCard
           actionRequest={chatState.actionRequest}
@@ -81,7 +92,7 @@ export function ChatTranscript({
           onSubmit={onSubmitAction}
         />
       ) : null}
-      {showStreamingIndicator ? (
+      {showStreamingIndicator && !hasInlineStreamingAssistant ? (
         <StreamingIndicator programIcon={programIcon} programName={programName} />
       ) : null}
     </div>

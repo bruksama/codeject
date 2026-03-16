@@ -41,7 +41,7 @@ The frontend is built as a static export and served by the backend.
 - provider transcript parsers for Claude transcript `.jsonl` files and Codex rollout `.jsonl` files
 - tmux bridge service for session create, send-keys, resize, capture-pane, and kill-session
 - terminal session manager that maps app session IDs to tmux targets
-- session supervisor that prefers provider transcript content, falls back to sanitized tmux snapshots, derives conservative terminal-required signals, and emits high-confidence chat action requests for simple confirms and numbered selections
+- session supervisor that creates a pending assistant placeholder on prompt, prefers provider transcript content, falls back to sanitized tmux snapshots only when the current prompt can be anchored safely, derives conservative terminal-required signals, and emits high-confidence chat action requests for simple confirms and numbered selections
 - WebSocket upgrade handler with ping/pong heartbeat plus chat bootstrap/update, surface mode, and terminal init/snapshot/update frames
 - tmux runtimes stay alive across websocket disconnects until explicit delete or stale-session cleanup
 - websocket session sync that persists connection state, terminal size, and tmux target metadata

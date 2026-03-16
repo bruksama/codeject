@@ -81,7 +81,17 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     const terminal = terminalRef.current;
     if (!terminal) return;
     terminal.reset();
-    terminal.write(snapshot.content, () => terminal.scrollToBottom());
+    terminal.write(snapshot.content, () => {
+      if (terminalRef.current !== terminal || !terminal.element?.isConnected) {
+        return;
+      }
+
+      try {
+        terminal.scrollToBottom();
+      } catch {
+        // xterm can still be mid-dispose or mid-layout when async writes flush.
+      }
+    });
   }, [snapshot.content, snapshot.seq]);
 
   return (

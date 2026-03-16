@@ -57,33 +57,41 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     if (!session || !content.trim()) return null;
     this.clearAssistantTimer(sessionId);
     const timestamp = new Date();
-    const message: Message = {
+    const userMessage: Message = {
       content: content.trim(),
       id: uuidv4(),
       role: 'user',
       timestamp,
     };
+    const assistantMessage: Message = {
+      content: '',
+      id: uuidv4(),
+      isStreaming: true,
+      role: 'assistant',
+      timestamp,
+    };
     const chatState: ChatState = {
       actionRequest: undefined,
-      lastAssistantMessageId: undefined,
-      lastPrompt: message.content,
+      lastAssistantMessageId: assistantMessage.id,
+      lastPrompt: userMessage.content,
       phase: 'awaiting-assistant',
       transcriptUpdatedAt: timestamp,
     };
     await this.sessionStore.updateSession(sessionId, {
       chatState,
       lastMessageAt: timestamp,
-      messages: [...session.messages, message],
+      messages: [...session.messages, userMessage, assistantMessage],
       surfaceMode: 'chat',
       surfaceRequirement: 'terminal-available',
     });
-    this.emit('chat:message', sessionId, message);
+    this.emit('chat:message', sessionId, userMessage);
+    this.emit('chat:message', sessionId, assistantMessage);
     this.emit('surface:update', sessionId, {
       chatState,
       mode: 'chat',
       requirement: 'terminal-available',
     });
-    return message;
+    return userMessage;
   }
 
   async handleSurfaceModeChange(sessionId: string, mode: SurfaceMode) {
@@ -154,6 +162,9 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     const currentMessage = session.chatState?.lastAssistantMessageId
       ? session.messages.find((message) => message.id === session.chatState?.lastAssistantMessageId)
       : undefined;
+    if (isStaleAssistantCarryover(session, currentMessage, content)) {
+      return;
+    }
     if (currentMessage?.content === content) return;
 
     const timestamp = new Date();
@@ -298,13 +309,15 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     if (!message?.isStreaming) return;
     const chatState: ChatState = {
       ...session.chatState,
+      lastAssistantMessageId: message.content.trim() ? messageId : undefined,
       phase: session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle',
     };
+    const nextMessages = message.content.trim()
+      ? session.messages.map((entry) => (entry.id === messageId ? { ...entry, isStreaming: false } : entry))
+      : session.messages.filter((entry) => entry.id !== messageId);
     await this.sessionStore.updateSession(sessionId, {
       chatState,
-      messages: session.messages.map((entry) =>
-        entry.id === messageId ? { ...entry, isStreaming: false } : entry
-      ),
+      messages: nextMessages,
     });
     this.emit('chat:update', sessionId, messageId, message.content, false);
     this.emit('surface:update', sessionId, {
@@ -314,6 +327,38 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
       requirement: session.surfaceRequirement,
     });
   }
+}
+
+function isStaleAssistantCarryover(
+  session: Session,
+  currentMessage: Message | undefined,
+  content: string
+) {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) return false;
+
+  const isFreshPlaceholder =
+    currentMessage?.role === 'assistant' &&
+    currentMessage.isStreaming === true &&
+    !currentMessage.content.trim() &&
+    (session.chatState?.phase === 'awaiting-assistant' ||
+      session.chatState?.phase === 'streaming-assistant');
+
+  if (!isFreshPlaceholder) {
+    return false;
+  }
+
+  const previousSettledAssistant = [...session.messages]
+    .reverse()
+    .find(
+      (message) =>
+        message.id !== currentMessage.id &&
+        message.role === 'assistant' &&
+        !message.isStreaming &&
+        message.content.trim()
+    );
+
+  return previousSettledAssistant?.content.trim() === trimmedContent;
 }
 
 function shouldAcceptTranscriptResult(
@@ -390,8 +435,9 @@ function deriveActionRequest({
 function deriveAssistantContent(content: string, lastPrompt: string | undefined) {
   const sanitized = extractChatResponseFromTerminal(content);
   const lines = sanitized.split('\n').map((line) => line.trimEnd());
-  const anchorIndex =
-    lastPrompt && lastPrompt.trim() ? findLastPromptLine(lines, lastPrompt.trim()) : -1;
+  const trimmedPrompt = lastPrompt?.trim();
+  const anchorIndex = trimmedPrompt ? findLastPromptLine(lines, trimmedPrompt) : -1;
+  if (trimmedPrompt && anchorIndex < 0) return '';
   let candidateLines = (anchorIndex >= 0 ? lines.slice(anchorIndex + 1) : lines)
     .filter((line) => line.trim());
 
@@ -402,7 +448,7 @@ function deriveAssistantContent(content: string, lastPrompt: string | undefined)
   candidateLines = candidateLines.slice(-40);
 
   const text = candidateLines.join('\n').trim();
-  return text && text !== lastPrompt?.trim() ? text : '';
+  return text && text !== trimmedPrompt ? text : '';
 }
 
 function deriveClaudeTerminalAssistantContent(content: string, lastPrompt: string | undefined) {

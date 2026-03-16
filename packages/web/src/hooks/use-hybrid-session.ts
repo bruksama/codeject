@@ -26,6 +26,13 @@ interface HybridSize {
 interface HybridState {
   chatState?: ChatState;
   lastError: string | null;
+  optimisticPrompt?: {
+    acknowledgedAssistant: boolean;
+    acknowledgedUser: boolean;
+    assistantMessage: Message;
+    prompt: string;
+    userMessage: Message;
+  };
   sessionId?: string;
   snapshot: TerminalSnapshot;
   status: ConnectionStatus;
@@ -78,9 +85,45 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
             });
             return;
           case 'chat:message':
+            setState((current) => {
+              const optimisticPrompt = current.optimisticPrompt;
+              if (!optimisticPrompt) {
+                return current;
+              }
+
+              const acknowledgedUser =
+                optimisticPrompt.acknowledgedUser ||
+                (message.message.role === 'user' &&
+                  message.message.content.trim() === optimisticPrompt.prompt);
+              const acknowledgedAssistant =
+                optimisticPrompt.acknowledgedAssistant ||
+                (message.message.role === 'assistant' &&
+                  message.message.isStreaming === true &&
+                  !message.message.content.trim());
+
+              if (acknowledgedUser && acknowledgedAssistant) {
+                return { ...current, optimisticPrompt: undefined };
+              }
+
+              return {
+                ...current,
+                optimisticPrompt: {
+                  ...optimisticPrompt,
+                  acknowledgedAssistant,
+                  acknowledgedUser,
+                },
+              };
+            });
             addMessage(sessionId, normalizeMessage(message.message));
             return;
           case 'chat:update':
+            setState((current) => {
+              if (!current.optimisticPrompt) {
+                return current;
+              }
+
+              return message.content.trim() ? { ...current, optimisticPrompt: undefined } : current;
+            });
             updateMessage(sessionId, message.messageId, {
               content: message.content,
               isStreaming: message.isStreaming,
@@ -161,7 +204,7 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
         clientRef.current?.disconnect();
       },
       lastError: state.lastError,
-      messages: sessionMessages,
+      messages: mergeOptimisticMessages(sessionMessages, state.optimisticPrompt),
       openSurface(mode: SurfaceMode) {
         if (!sessionId) return;
         setState((current) => ({ ...current, surfaceMode: mode }));
@@ -175,6 +218,40 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
       sendPrompt(content: string) {
         const trimmed = content.trim();
         if (!trimmed) return false;
+        const timestamp = new Date();
+        const promptKey = `${timestamp.getTime()}`;
+        setState((current) => ({
+          ...current,
+          chatState: {
+            ...current.chatState,
+            actionRequest: undefined,
+            lastAssistantMessageId: undefined,
+            lastPrompt: trimmed,
+            phase: 'awaiting-assistant',
+            terminalRequiredReason: undefined,
+            transcriptUpdatedAt: timestamp,
+          },
+          optimisticPrompt: {
+            acknowledgedAssistant: false,
+            acknowledgedUser: false,
+            assistantMessage: {
+              content: '',
+              id: `optimistic-assistant-${promptKey}`,
+              isStreaming: true,
+              role: 'assistant',
+              timestamp,
+            },
+            prompt: trimmed,
+            userMessage: {
+              content: trimmed,
+              id: `optimistic-user-${promptKey}`,
+              role: 'user',
+              timestamp,
+            },
+          },
+          surfaceMode: 'chat',
+          surfaceRequirement: 'terminal-available',
+        }));
         clientRef.current?.send({ content: trimmed, type: 'chat:prompt' });
         return true;
       },
@@ -199,6 +276,24 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
     }),
     [sessionId, sessionMessages, state, updateSession]
   );
+}
+
+function mergeOptimisticMessages(
+  sessionMessages: Message[],
+  optimisticPrompt: HybridState['optimisticPrompt']
+) {
+  if (!optimisticPrompt) {
+    return sessionMessages;
+  }
+
+  const merged = [...sessionMessages];
+  if (!optimisticPrompt.acknowledgedUser) {
+    merged.push(optimisticPrompt.userMessage);
+  }
+  if (!optimisticPrompt.acknowledgedAssistant) {
+    merged.push(optimisticPrompt.assistantMessage);
+  }
+  return merged;
 }
 
 function normalizeMessage(message: Message) {
