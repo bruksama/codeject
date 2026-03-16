@@ -40,6 +40,10 @@ import {
 } from '@/lib/api-client';
 import { useAppStore } from '@/stores/useAppStore';
 
+const APP_VERSION = '1.1.0';
+const GITHUB_REPOSITORY_URL = 'https://github.com/bruksama/codeject';
+const GITHUB_REPOSITORY_LABEL = 'github.com/bruksama/codeject';
+
 // Tunnel status badge
 function TunnelStatusBadge({ status }: { status: string }) {
   const config = {
@@ -365,7 +369,7 @@ export default function SettingsPage() {
           <AppLogo size={32} />
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white/90">Settings</h1>
-            <p className="text-[10px] text-white/30 -mt-0.5">Codeject v1.0.0</p>
+            <p className="text-[10px] text-white/30 -mt-0.5">Codeject v{APP_VERSION}</p>
           </div>
         </div>
       </header>
@@ -644,16 +648,16 @@ export default function SettingsPage() {
             icon={<Info size={16} className="accent-text" />}
             label="Version"
             type="value"
-            value="1.0.0 (build 42)"
+            value={APP_VERSION}
             showDivider
           />
           <SettingsItem
             icon={<Github size={16} className="accent-text" />}
             label="GitHub Repository"
-            sublabel="github.com/codeject/codeject"
+            sublabel={GITHUB_REPOSITORY_LABEL}
             type="disclosure"
             showDivider
-            onClick={() => toast.info('Opening GitHub…')}
+            onClick={() => window.open(GITHUB_REPOSITORY_URL, '_blank', 'noopener,noreferrer')}
           />
           <SettingsItem
             icon={<FileText size={16} className="accent-text" />}
@@ -690,7 +694,7 @@ export default function SettingsPage() {
         {/* Version footer */}
         <div className="flex flex-col items-center gap-1 py-6">
           <AppLogo size={28} />
-          <p className="text-xs text-white/20 mt-1">Codeject · v1.0.0</p>
+          <p className="text-xs text-white/20 mt-1">Codeject · v{APP_VERSION}</p>
           <p className="text-[10px] text-white/15">Built for developers, by developers</p>
         </div>
       </div>

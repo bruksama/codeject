@@ -51,8 +51,8 @@ export default function SettingsItem({
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{
-              background: 'rgba(124,58,237,0.15)',
-              border: '1px solid rgba(124,58,237,0.2)',
+              background: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent-primary) 24%, transparent)',
             }}
           >
             {icon}

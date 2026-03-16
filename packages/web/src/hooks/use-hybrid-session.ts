@@ -3,6 +3,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
   type ChatState,
+  type ChatStatePhase,
   type ConnectionStatus,
   type Message,
   type SurfaceMode,
@@ -214,7 +215,8 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
       interruptPrompt() {
         if (!sessionId) return;
         const timestamp = new Date();
-        const nextPhase = state.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
+        const nextPhase: ChatStatePhase =
+          state.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
         const nextChatState = state.chatState
           ? {
               ...state.chatState,
