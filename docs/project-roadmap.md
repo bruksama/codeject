@@ -53,6 +53,10 @@ Completed:
 - mobile terminal controls now provide enter, backspace, ctrl, escape, tab, and arrow keys
 - conservative backend detection can mark sessions as terminal-required for approvals and menus
 - hybrid websocket frames now carry chat, surface, and terminal state together
+- provider transcript readers now resolve Claude and Codex local transcript files when available
+- chat bootstrap now prefers parsed provider messages over raw tmux TUI dumps
+- terminal reconnect now clears stale pane metadata and recreates tmux sessions instead of crashing on missing panes
+- websocket terminal command failures now surface as runtime errors instead of being mislabeled as invalid frames
 
 ## Phase 5
 

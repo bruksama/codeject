@@ -14,7 +14,8 @@ Browser
 Express + WebSocket
   -> session store under ~/.codeject/sessions
   -> tmux bridge for per-session runtime ownership
-  -> session supervisor for derived chat and terminal-required detection
+  -> provider transcript readers for Claude/Codex message extraction
+  -> session supervisor for derived chat bootstrap and terminal-required detection
 ```
 
 The frontend is built as a static export and served by the backend.
@@ -37,12 +38,14 @@ The frontend is built as a static export and served by the backend.
 - auth middleware that bypasses local requests
 - file-backed stores under `~/.codeject`
 - CLI adapters that still build the launch command for Claude Code, Codex, and generic shell programs
+- provider transcript parsers for Claude transcript `.jsonl` files and Codex rollout `.jsonl` files
 - tmux bridge service for session create, send-keys, resize, capture-pane, and kill-session
 - terminal session manager that maps app session IDs to tmux targets
-- session supervisor that derives chat transcript updates and conservative terminal-required signals from tmux snapshots
+- session supervisor that prefers provider transcript content, falls back to sanitized tmux snapshots, and derives conservative terminal-required signals
 - WebSocket upgrade handler with ping/pong heartbeat plus chat bootstrap/update, surface mode, and terminal init/snapshot/update frames
 - tmux runtimes stay alive across websocket disconnects until explicit delete or stale-session cleanup
 - websocket session sync that persists connection state, terminal size, and tmux target metadata
+- stale tmux pane/session errors now degrade to idle runtime state instead of crashing the server
 
 ### Shared
 
@@ -60,6 +63,7 @@ The frontend is built as a static export and served by the backend.
 - sessions: `~/.codeject/sessions/*.json`
 - terminal scrollback: tmux pane history only, not disk-backed JSON
 - derived transcript: stored in session JSON for UX bootstrap only
+- provider runtime metadata: stored in session JSON to cache matched transcript path and provider session id
 
 ## Auth Model
 
@@ -75,5 +79,5 @@ Current constraints:
 
 - host machine must have `tmux` installed
 - snapshot mirroring currently refreshes whole terminal content instead of diff streaming
-- chat extraction is heuristic and intentionally conservative
+- chat extraction is best-effort: provider transcript first, sanitized tmux fallback second
 - terminal remains the fallback path for approvals, menus, and raw TUI recovery

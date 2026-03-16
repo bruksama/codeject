@@ -6,6 +6,7 @@ Requirements:
 
 - Node.js matching `packageManager` expectations
 - npm
+- `tmux`
 
 Commands:
 
@@ -25,6 +26,12 @@ Start:
 - `npm start`
 
 The production server listens on `PORT` or defaults to `3500`.
+
+Current local production scope:
+
+- phases 1 to 4 are implemented locally
+- hybrid chat and terminal surfaces are available over the same WebSocket session
+- provider transcript parsing improves chat bootstrap for Claude and Codex sessions when local transcript files exist
 
 ## Environment
 
@@ -48,4 +55,3 @@ The app writes local state under:
 ## Remote Access
 
 Remote tunnel deployment is planned for phase 5 and is not production-ready yet.
-

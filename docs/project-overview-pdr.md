@@ -2,7 +2,7 @@
 
 ## Product
 
-Codeject is a phone-friendly interface for controlling local CLI coding assistants through one backend server. The user can create sessions, connect them to CLI programs, stream output, and eventually expose the app remotely through a tunnel.
+Codeject is a phone-friendly interface for controlling local CLI coding assistants through one backend server. The user can create sessions, connect them to CLI programs, switch between chat-first and terminal views, and eventually expose the app remotely through a tunnel.
 
 ## Problem
 
@@ -28,20 +28,22 @@ Local coding CLIs are powerful but awkward to monitor or drive from a phone. The
 - static frontend export served by backend
 - authenticated non-local API and WS access
 - disk-backed session/config persistence
-- PTY-backed process lifecycle in later phases
+- tmux-backed persistent runtime lifecycle
 - shared type definitions between frontend and backend
 
 ## Current Delivery State
 
 - phase 1 complete
 - phase 2 complete
-- backend core exists, but CLI PTY bridge is not yet implemented
-- frontend still uses mock-state flows for most interactions
+- phase 3 complete
+- phase 4 complete
+- backend manages persistent tmux runtimes for Claude Code, Codex, and generic CLIs
+- frontend uses real backend sessions, config APIs, and hybrid WebSocket flows
+- chat bootstrap can derive cleaner assistant messages from provider transcripts instead of showing raw TUI output when a transcript is available
 
 ## Non-Goals For Current State
 
 - multi-user auth model
 - cloud-hosted SaaS deployment
 - SSR-heavy frontend behavior
-- terminal emulation in phase 2
-
+- remote tunnel flow before phase 5
