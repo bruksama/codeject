@@ -57,6 +57,7 @@ function hydrateSession(session: Session): Session {
     createdAt: new Date(session.createdAt),
     lastMessageAt: new Date(session.lastMessageAt),
     chatState: normalizeChatState(session.chatState),
+    providerRuntime: session.providerRuntime,
     sessionOptions: normalizeSessionOptions(session),
     surfaceMode: session.surfaceMode ?? 'chat',
     surfaceRequirement: session.surfaceRequirement ?? 'terminal-available',
@@ -97,6 +98,7 @@ export class SessionStore {
       lastMessageAt: input.lastMessageAt ? new Date(input.lastMessageAt) : new Date(),
       chatState: normalizeChatState(input.chatState),
       messages: input.messages ?? [],
+      providerRuntime: input.providerRuntime,
       surfaceMode: input.surfaceMode ?? 'chat',
       surfaceRequirement: input.surfaceRequirement ?? 'terminal-available',
     };
@@ -118,6 +120,7 @@ export class SessionStore {
         lastMessageAt: updates.lastMessageAt ? new Date(updates.lastMessageAt) : existing.lastMessageAt,
         chatState:
           'chatState' in updates ? normalizeChatState(updates.chatState) : existing.chatState,
+        providerRuntime: updates.providerRuntime ?? existing.providerRuntime,
         sessionOptions: updates.sessionOptions ?? existing.sessionOptions,
         surfaceMode: updates.surfaceMode ?? existing.surfaceMode,
         surfaceRequirement: updates.surfaceRequirement ?? existing.surfaceRequirement,

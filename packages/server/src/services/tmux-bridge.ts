@@ -67,10 +67,18 @@ export class TmuxBridge {
 
   async getPaneSnapshot(paneId: string): Promise<TmuxPaneSnapshot> {
     await this.ensureAvailable();
-    const [{ stdout: content }, { stdout: sizeLine }] = await Promise.all([
-      this.run(['capture-pane', '-p', '-e', '-J', '-S', SNAPSHOT_HISTORY_LINES, '-t', paneId]),
-      this.run(['display-message', '-p', '-t', paneId, '#{pane_width}\t#{pane_height}\t#{pane_dead}']),
-    ]);
+    let content = '';
+    let sizeLine = '120\t32\t1';
+    try {
+      [{ stdout: content }, { stdout: sizeLine }] = await Promise.all([
+        this.run(['capture-pane', '-p', '-e', '-J', '-S', SNAPSHOT_HISTORY_LINES, '-t', paneId]),
+        this.run(['display-message', '-p', '-t', paneId, '#{pane_width}\t#{pane_height}\t#{pane_dead}']),
+      ]);
+    } catch (error) {
+      if (!isMissingTargetError(error)) {
+        throw error;
+      }
+    }
     const [colsText = '120', rowsText = '32', deadText = '0'] = sizeLine.trim().split('\t');
     return {
       cols: Number.parseInt(colsText, 10) || 120,

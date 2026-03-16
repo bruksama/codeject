@@ -30,6 +30,7 @@ export function createSessionsRoutes(terminalSessionManager: TerminalSessionMana
       chatState: payload.chatState,
       name: payload.name,
       cliProgram: payload.cliProgram,
+      providerRuntime: payload.providerRuntime,
       workspacePath: payload.workspacePath,
       sessionOptions: payload.sessionOptions,
       messages: payload.messages ?? [],

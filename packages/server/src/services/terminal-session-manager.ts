@@ -157,7 +157,15 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return false;
     const nextSize = normalizeSize(size);
-    await this.tmuxBridge.resizePane(runtime.target.paneId, nextSize.cols, nextSize.rows);
+    try {
+      await this.tmuxBridge.resizePane(runtime.target.paneId, nextSize.cols, nextSize.rows);
+    } catch (error) {
+      if (isMissingTargetError(error)) {
+        await this.handleDeadPane(sessionId, runtime);
+        return false;
+      }
+      throw error;
+    }
     await this.touchSession(sessionId, runtime);
     return true;
   }
@@ -165,7 +173,15 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
   async sendInput(sessionId: string, input: string) {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return false;
-    await this.tmuxBridge.sendText(runtime.target.paneId, input);
+    try {
+      await this.tmuxBridge.sendText(runtime.target.paneId, input);
+    } catch (error) {
+      if (isMissingTargetError(error)) {
+        await this.handleDeadPane(sessionId, runtime);
+        return false;
+      }
+      throw error;
+    }
     await this.touchSession(sessionId, runtime);
     await this.pollSession(sessionId);
     return true;
@@ -174,7 +190,15 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
   async sendKey(sessionId: string, key: TerminalKey) {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return false;
-    await this.tmuxBridge.sendKey(runtime.target.paneId, mapTerminalKey(key));
+    try {
+      await this.tmuxBridge.sendKey(runtime.target.paneId, mapTerminalKey(key));
+    } catch (error) {
+      if (isMissingTargetError(error)) {
+        await this.handleDeadPane(sessionId, runtime);
+        return false;
+      }
+      throw error;
+    }
     await this.touchSession(sessionId, runtime);
     await this.pollSession(sessionId);
     return true;
@@ -248,6 +272,7 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     await this.sessionStore.updateSession(sessionId, {
       lastMessageAt: new Date(),
       status: 'idle',
+      terminal: undefined,
     });
     this.emit('status', sessionId, 'idle');
   }
@@ -266,6 +291,10 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
       this.touchRuntime(sessionId, runtime);
       this.emit('update', sessionId, snapshot);
     } catch (error) {
+      if (isMissingTargetError(error)) {
+        await this.handleDeadPane(sessionId, runtime);
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Failed to capture terminal state';
       this.emit('error', sessionId, message);
       await this.sessionStore.updateSession(sessionId, {
@@ -358,6 +387,10 @@ function normalizeSize(size: Partial<TerminalSize> | undefined): TerminalSize {
     cols: Math.max(40, size?.cols ?? 120),
     rows: Math.max(12, size?.rows ?? 32),
   };
+}
+
+function isMissingTargetError(error: unknown) {
+  return error instanceof Error && /can't find session|can't find pane/i.test(error.message);
 }
 
 function buildShellCommand(command: string, args: string[]) {

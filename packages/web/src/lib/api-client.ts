@@ -68,6 +68,7 @@ function normalizeSession(session: Session): Session {
     createdAt: new Date(session.createdAt),
     lastMessageAt: new Date(session.lastMessageAt),
     messages: session.messages.map(normalizeMessage),
+    providerRuntime: session.providerRuntime,
     surfaceMode: session.surfaceMode ?? 'chat',
     surfaceRequirement: session.surfaceRequirement ?? 'terminal-available',
     terminal: session.terminal

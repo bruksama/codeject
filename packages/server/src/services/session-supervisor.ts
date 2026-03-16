@@ -8,6 +8,7 @@ import {
   type SurfaceRequirement,
   type TerminalSnapshot,
 } from '@codeject/shared';
+import { ProviderTranscriptReader } from './provider-transcript-reader.js';
 import { type SessionStore } from './session-store.js';
 import { extractChatResponseFromTerminal } from '../utils/output-sanitizer.js';
 
@@ -30,19 +31,22 @@ const TERMINAL_REQUIRED_PATTERNS = [
 
 export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   private readonly assistantTimers = new Map<string, NodeJS.Timeout>();
+  private readonly transcriptReader: ProviderTranscriptReader;
 
   constructor(private readonly sessionStore: SessionStore) {
     super();
+    this.transcriptReader = new ProviderTranscriptReader(sessionStore);
   }
 
   async getBootstrap(sessionId: string) {
     const session = await this.sessionStore.getSession(sessionId);
     if (!session) return null;
+    const syncedSession = await this.syncBootstrapTranscript(session);
     return {
-      chatState: session.chatState,
-      messages: session.messages,
-      surfaceMode: session.surfaceMode,
-      surfaceRequirement: session.surfaceRequirement,
+      chatState: syncedSession.chatState,
+      messages: syncedSession.messages,
+      surfaceMode: syncedSession.surfaceMode,
+      surfaceRequirement: syncedSession.surfaceRequirement,
     };
   }
 
@@ -103,7 +107,10 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     const detection = detectTerminalRequirement(snapshot.content);
     const nextRequirement: SurfaceRequirement = detection ? 'terminal-required' : 'terminal-available';
     const nextChatState = deriveChatState(session, detection?.reason);
-    const assistantContent = detection ? '' : deriveAssistantContent(snapshot.content, session.chatState?.lastPrompt);
+    const transcriptResult = detection ? null : await this.transcriptReader.readAssistantMessage(session);
+    const transcriptContent = transcriptResult?.content ?? null;
+    const assistantContent =
+      transcriptContent || (detection ? '' : deriveAssistantContent(snapshot.content, session.chatState?.lastPrompt));
 
     if (
       nextRequirement !== session.surfaceRequirement ||
@@ -187,6 +194,40 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     this.assistantTimers.delete(sessionId);
   }
 
+  private async syncBootstrapTranscript(session: Session) {
+    const transcriptResult = await this.transcriptReader.readAssistantMessage(session).catch(() => null);
+    const transcriptContent = transcriptResult?.content?.trim();
+    if (!transcriptContent) return session;
+
+    const lastAssistantMessageId =
+      session.chatState?.lastAssistantMessageId ??
+      [...session.messages].reverse().find((message) => message.role === 'assistant')?.id;
+    if (!lastAssistantMessageId) return session;
+
+    const currentMessage = session.messages.find((message) => message.id === lastAssistantMessageId);
+    if (currentMessage?.content === transcriptContent && !currentMessage.isStreaming) {
+      return session;
+    }
+
+    const timestamp = new Date();
+    return (
+      (await this.sessionStore.updateSession(session.id, {
+        chatState: {
+          ...session.chatState,
+          lastAssistantMessageId,
+          phase: session.chatState?.phase ?? 'idle',
+          transcriptUpdatedAt: timestamp,
+        },
+        lastMessageAt: timestamp,
+        messages: session.messages.map((message) =>
+          message.id === lastAssistantMessageId
+            ? { ...message, content: transcriptContent, isStreaming: false, timestamp }
+            : message
+        ),
+      })) ?? session
+    );
+  }
+
   private async finalizeAssistantMessage(sessionId: string) {
     this.clearAssistantTimer(sessionId);
     const session = await this.sessionStore.getSession(sessionId);
@@ -228,11 +269,59 @@ function deriveAssistantContent(content: string, lastPrompt: string | undefined)
   const lines = sanitized.split('\n').map((line) => line.trimEnd());
   const anchorIndex =
     lastPrompt && lastPrompt.trim() ? findLastPromptLine(lines, lastPrompt.trim()) : -1;
-  const candidateLines = (anchorIndex >= 0 ? lines.slice(anchorIndex + 1) : lines)
-    .filter((line) => line.trim())
-    .slice(-40);
+  let candidateLines = (anchorIndex >= 0 ? lines.slice(anchorIndex + 1) : lines)
+    .filter((line) => line.trim());
+
+  // Strip TUI chrome from the start (thinking, status bars, tool headers)
+  candidateLines = stripTuiChrome(candidateLines);
+
+  // Keep last 40 lines of actual content
+  candidateLines = candidateLines.slice(-40);
+
   const text = candidateLines.join('\n').trim();
   return text && text !== lastPrompt?.trim() ? text : '';
+}
+
+/**
+ * Remove TUI structural chrome from start and end of content lines.
+ * Strips thinking indicators, status bars, tool call headers, and footer hints.
+ */
+function stripTuiChrome(lines: string[]): string[] {
+  // Reuse patterns from output-sanitizer to avoid duplication
+  const TUI_START_MARKERS = [
+    /^\s*(thinking|processing|waiting|loading|\.+)\s*$/i,
+    /^\s*\[.*(?:status|tool|thinking|waiting|loading).*\]\s*$/i,
+    /^\s*╭+|╮+|╯+|╰+\s*$/,
+    /^\s*│.*(?:status|tool|thinking)\s*│\s*$/,
+    /^\s*⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏\s*/,
+  ];
+
+  const TUI_END_MARKERS = [
+    /^\s*(press|hit|type|select)\s+/i,
+    /^\s*\[.*(?:help|hint|key|shortcut).*\]\s*$/i,
+    /^\s*│.*(?:press|hit|key|ctrl|cmd).*│\s*$/i,
+    /^[\u2500-\u257f\s]+$/, // Bottom border lines
+  ];
+
+  // Strip from start - find first non-matching line
+  let start = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!TUI_START_MARKERS.some((pattern) => pattern.test(lines[i]))) {
+      start = i;
+      break;
+    }
+  }
+
+  // Strip from end - find last non-matching line
+  let end = lines.length;
+  for (let i = lines.length - 1; i >= start; i--) {
+    if (!TUI_END_MARKERS.some((pattern) => pattern.test(lines[i]))) {
+      end = i + 1;
+      break;
+    }
+  }
+
+  return lines.slice(start, end);
 }
 
 function findLastPromptLine(lines: string[], prompt: string) {

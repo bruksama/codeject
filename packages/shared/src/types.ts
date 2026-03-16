@@ -68,6 +68,12 @@ export interface ChatState {
   transcriptUpdatedAt?: Date;
 }
 
+export interface ProviderRuntime {
+  provider: 'claude' | 'codex' | 'generic';
+  providerSessionId?: string;
+  transcriptPath?: string;
+}
+
 export interface Session {
   id: string;
   name: string;
@@ -76,6 +82,7 @@ export interface Session {
   sessionOptions?: CliSessionOptions;
   messages: Message[];
   chatState?: ChatState;
+  providerRuntime?: ProviderRuntime;
   status: ConnectionStatus;
   surfaceMode: SurfaceMode;
   surfaceRequirement: SurfaceRequirement;

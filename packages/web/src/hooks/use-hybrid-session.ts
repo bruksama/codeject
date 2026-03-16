@@ -146,9 +146,9 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
   }, [size]);
 
   useEffect(() => {
-    if (!clientRef.current || !sessionId) return;
+    if (!clientRef.current || !sessionId || state.status !== 'connected') return;
     clientRef.current.send({ cols: size.cols, rows: size.rows, type: 'terminal:resize' });
-  }, [sessionId, size.cols, size.rows]);
+  }, [sessionId, size.cols, size.rows, state.status]);
 
   return useMemo(
     () => ({

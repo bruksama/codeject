@@ -7,6 +7,7 @@ export type {
   ConnectionStatus,
   Message,
   MessageRole,
+  ProviderRuntime,
   RemoteAccessSettings,
   Session,
   SurfaceMode,

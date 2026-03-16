@@ -151,32 +151,39 @@ export function createWebSocketHandler({
   }
 
   async function handleClientConnected(sessionId: string, sendFrame: (frame: ServerWebSocketMessage) => void) {
-    const session = await sessionStore.getSession(sessionId);
-    if (!session) {
-      sendFrame({ type: 'terminal:error', message: 'Session not found' });
-      return;
-    }
+    try {
+      const session = await sessionStore.getSession(sessionId);
+      if (!session) {
+        sendFrame({ type: 'terminal:error', message: 'Session not found' });
+        return;
+      }
 
-    await terminalSessionManager.observe(session);
-    const snapshot = await terminalSessionManager.getSnapshot(sessionId);
-    const nextSession = await sessionStore.getSession(sessionId);
-    const bootstrap = await sessionSupervisor.getBootstrap(sessionId);
-    await sessionSync.updateSessionStatus(sessionId, 'connected');
-    sendFrame({
-      chatState: nextSession?.chatState,
-      type: 'terminal:ready',
-      sessionId,
-      status: 'connected',
-      surfaceMode: nextSession?.surfaceMode ?? 'chat',
-      surfaceRequirement: nextSession?.surfaceRequirement ?? 'terminal-available',
-      terminal: nextSession?.terminal,
-    });
-    sendFrame({
-      type: 'chat:bootstrap',
-      chatState: bootstrap?.chatState,
-      messages: bootstrap?.messages ?? [],
-    });
-    sendFrame({ type: 'terminal:snapshot', snapshot });
+      await terminalSessionManager.observe(session);
+      const snapshot = await terminalSessionManager.getSnapshot(sessionId);
+      const nextSession = await sessionStore.getSession(sessionId);
+      const bootstrap = await sessionSupervisor.getBootstrap(sessionId);
+      await sessionSync.updateSessionStatus(sessionId, 'connected');
+      sendFrame({
+        chatState: nextSession?.chatState,
+        type: 'terminal:ready',
+        sessionId,
+        status: 'connected',
+        surfaceMode: nextSession?.surfaceMode ?? 'chat',
+        surfaceRequirement: nextSession?.surfaceRequirement ?? 'terminal-available',
+        terminal: nextSession?.terminal,
+      });
+      sendFrame({
+        type: 'chat:bootstrap',
+        chatState: bootstrap?.chatState,
+        messages: bootstrap?.messages ?? [],
+      });
+      sendFrame({ type: 'terminal:snapshot', snapshot });
+    } catch (error) {
+      sendFrame({
+        type: 'terminal:error',
+        message: error instanceof Error ? error.message : 'Failed to connect terminal session',
+      });
+    }
   }
 
   async function handleClientMessage(
@@ -186,61 +193,72 @@ export function createWebSocketHandler({
   ) {
     try {
       const frame = JSON.parse(payload.toString()) as ClientWebSocketMessage;
-      switch (frame.type) {
-        case 'chat:prompt': {
-          const session = await sessionStore.getSession(sessionId);
-          if (!session) {
-            sendFrame({ type: 'terminal:error', message: 'Session not found' });
+      try {
+        switch (frame.type) {
+          case 'chat:prompt': {
+            const session = await sessionStore.getSession(sessionId);
+            if (!session) {
+              sendFrame({ type: 'terminal:error', message: 'Session not found' });
+              return;
+            }
+            await terminalSessionManager.ensureSession(session);
+            await sessionSupervisor.handleChatPrompt(sessionId, frame.content);
+            if (!(await terminalSessionManager.sendInput(sessionId, frame.content))) {
+              sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
+              return;
+            }
+            await terminalSessionManager.sendKey(sessionId, 'Enter');
+            await sessionSync.touchSession(sessionId);
             return;
           }
-          await terminalSessionManager.ensureSession(session);
-          await sessionSupervisor.handleChatPrompt(sessionId, frame.content);
-          if (!(await terminalSessionManager.sendInput(sessionId, frame.content))) {
-            sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
+          case 'surface:set-mode':
+            await sessionSupervisor.handleSurfaceModeChange(sessionId, frame.mode);
+            return;
+          case 'terminal:init': {
+            await sessionSync.persistTerminalSize(sessionId, frame.cols, frame.rows);
+            const session = await sessionStore.getSession(sessionId);
+            if (!session) {
+              sendFrame({ type: 'terminal:error', message: 'Session not found' });
+              return;
+            }
+            await terminalSessionManager.ensureSession(session);
+            const snapshot = await terminalSessionManager.getSnapshot(sessionId);
+            sendFrame({ type: 'terminal:snapshot', snapshot });
             return;
           }
-          await terminalSessionManager.sendKey(sessionId, 'Enter');
-          await sessionSync.touchSession(sessionId);
-          return;
+          case 'terminal:input':
+            if (!(await terminalSessionManager.sendInput(sessionId, frame.data))) {
+              sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
+              return;
+            }
+            await sessionSync.touchSession(sessionId);
+            return;
+          case 'terminal:key':
+            if (!(await terminalSessionManager.sendKey(sessionId, frame.key))) {
+              sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
+              return;
+            }
+            await sessionSync.touchSession(sessionId);
+            return;
+          case 'terminal:ping':
+            sendFrame({ type: 'terminal:pong', sessionId });
+            return;
+          case 'terminal:resize':
+            if (!(await terminalSessionManager.resize(sessionId, { cols: frame.cols, rows: frame.rows }))) {
+              sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
+              return;
+            }
+            await sessionSync.persistTerminalSize(sessionId, frame.cols, frame.rows);
+            return;
+          default:
+            sendFrame({ type: 'terminal:error', message: 'Unsupported websocket message type' });
         }
-        case 'surface:set-mode':
-          await sessionSupervisor.handleSurfaceModeChange(sessionId, frame.mode);
-          return;
-        case 'terminal:init': {
-          await sessionSync.persistTerminalSize(sessionId, frame.cols, frame.rows);
-          const session = await sessionStore.getSession(sessionId);
-          if (!session) {
-            sendFrame({ type: 'terminal:error', message: 'Session not found' });
-            return;
-          }
-          await terminalSessionManager.ensureSession(session);
-          const snapshot = await terminalSessionManager.getSnapshot(sessionId);
-          sendFrame({ type: 'terminal:snapshot', snapshot });
-          return;
-        }
-        case 'terminal:input':
-          if (!(await terminalSessionManager.sendInput(sessionId, frame.data))) {
-            sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
-            return;
-          }
-          await sessionSync.touchSession(sessionId);
-          return;
-        case 'terminal:key':
-          if (!(await terminalSessionManager.sendKey(sessionId, frame.key))) {
-            sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
-            return;
-          }
-          await sessionSync.touchSession(sessionId);
-          return;
-        case 'terminal:ping':
-          sendFrame({ type: 'terminal:pong', sessionId });
-          return;
-        case 'terminal:resize':
-          await terminalSessionManager.resize(sessionId, { cols: frame.cols, rows: frame.rows });
-          await sessionSync.persistTerminalSize(sessionId, frame.cols, frame.rows);
-          return;
-        default:
-          sendFrame({ type: 'terminal:error', message: 'Unsupported websocket message type' });
+      } catch (error) {
+        logger.warn('Websocket command failed', error);
+        sendFrame({
+          type: 'terminal:error',
+          message: error instanceof Error ? error.message : 'Failed to process websocket command',
+        });
       }
     } catch (error: unknown) {
       logger.warn('Ignoring invalid websocket frame', error);

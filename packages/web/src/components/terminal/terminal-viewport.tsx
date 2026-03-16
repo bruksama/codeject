@@ -47,8 +47,9 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(container);
-    fitAddon.fit();
-    publishSize(terminal, onSizeChange, lastSentSizeRef);
+    requestAnimationFrame(() => {
+      safeFitTerminal(container, terminal, fitAddon, onSizeChange, lastSentSizeRef);
+    });
     const handleClick = () => terminal.focus();
     container.addEventListener('click', handleClick);
     terminal.focus();
@@ -57,8 +58,7 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     fitAddonRef.current = fitAddon;
 
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
-      publishSize(terminal, onSizeChange, lastSentSizeRef);
+      safeFitTerminal(container, terminal, fitAddon, onSizeChange, lastSentSizeRef);
     });
     resizeObserver.observe(container);
 
@@ -81,7 +81,7 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     const terminal = terminalRef.current;
     if (!terminal) return;
     terminal.reset();
-    terminal.write(snapshot.content);
+    terminal.write(snapshot.content, () => terminal.scrollToBottom());
   }, [snapshot.content, snapshot.seq]);
 
   return (
@@ -115,4 +115,20 @@ function publishSize(
   }
   lastSentSizeRef.current = nextSize;
   onSizeChange(nextSize);
+}
+
+function safeFitTerminal(
+  container: HTMLDivElement,
+  terminal: Terminal,
+  fitAddon: FitAddon,
+  onSizeChange: (size: { cols: number; rows: number }) => void,
+  lastSentSizeRef: MutableRefObject<{ cols: number; rows: number } | null>
+) {
+  if (!container.isConnected || !terminal.element) return;
+  try {
+    fitAddon.fit();
+    publishSize(terminal, onSizeChange, lastSentSizeRef);
+  } catch {
+    // xterm fit can race with mount/dispose; ignore and wait for the next stable resize.
+  }
 }

@@ -113,13 +113,13 @@ export function useCliStream(sessionId: string | undefined, size: StreamSize) {
   }, [size]);
 
   useEffect(() => {
-    if (!clientRef.current || !sessionId) return;
+    if (!clientRef.current || !sessionId || streamState.status !== 'connected') return;
     clientRef.current.send({
       cols: size.cols,
       rows: size.rows,
       type: 'terminal:resize',
     });
-  }, [sessionId, size.cols, size.rows]);
+  }, [sessionId, size.cols, size.rows, streamState.status]);
 
   return useMemo(() => {
     const currentState =
