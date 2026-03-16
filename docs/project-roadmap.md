@@ -57,6 +57,8 @@ Completed:
 - chat bootstrap now prefers parsed provider messages over raw tmux TUI dumps
 - terminal reconnect now clears stale pane metadata and recreates tmux sessions instead of crashing on missing panes
 - websocket terminal command failures now surface as runtime errors instead of being mislabeled as invalid frames
+- chat transcript now suppresses partial assistant text until finalize while keeping a stable in-progress indicator
+- hybrid chat can now surface simple confirm and numbered single-select action cards with one-tap terminal fallback
 
 ## Phase 5
 
