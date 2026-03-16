@@ -27,14 +27,23 @@ function formatRelativeTime(date: Date): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function getLastMessagePreview(session: Session): string {
-  const lastMsg = session.messages[session.messages.length - 1];
-  if (!lastMsg) return 'No messages yet';
-  const content = lastMsg.content
-    .replace(/```[\s\S]*?```/g, '[code block]')
-    .replace(/\n/g, ' ')
-    .trim();
-  return content.length > 68 ? content.slice(0, 68) + '…' : content;
+function getSessionPreview(session: Session): string {
+  if (session.terminal?.sessionName) {
+    return `Persistent terminal via ${session.terminal.sessionName}`;
+  }
+  if (session.status === 'starting') {
+    return 'Preparing terminal runtime';
+  }
+  if (session.status === 'connected') {
+    return 'Terminal connected';
+  }
+  if (session.status === 'disconnected') {
+    return 'Terminal disconnected';
+  }
+  if (session.status === 'error') {
+    return 'Terminal error';
+  }
+  return 'Ready to start terminal';
 }
 
 export default function SessionCard({ session, onDelete }: SessionCardProps) {
@@ -100,8 +109,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
     router.push('/chat-interface');
   };
 
-  const lastMsg = session.messages[session.messages.length - 1];
-  const preview = getLastMessagePreview(session);
+  const preview = getSessionPreview(session);
 
   return (
     <div
@@ -140,6 +148,18 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
           if (e.key === 'Enter') handleOpen();
         }}
       >
+        <button
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/6 text-white/55 transition hover:bg-red-500/15 hover:text-red-300"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleDelete();
+          }}
+          aria-label={`Delete session ${session.name}`}
+          type="button"
+        >
+          <Trash2 size={15} />
+        </button>
+
         <div className="flex items-start gap-3">
           {/* Program icon */}
           <div
@@ -172,15 +192,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
               </span>
             </div>
 
-            {/* Last message preview */}
-            <div className="flex items-start gap-1.5">
-              {lastMsg && (
-                <span className="text-[10px] text-white/25 flex-shrink-0 mt-0.5">
-                  {lastMsg.role === 'user' ? 'You:' : `${session.cliProgram.name.split(' ')[0]}:`}
-                </span>
-              )}
-              <p className="text-xs text-white/40 leading-relaxed line-clamp-2">{preview}</p>
-            </div>
+            <p className="text-xs text-white/40 leading-relaxed line-clamp-2">{preview}</p>
           </div>
         </div>
 
