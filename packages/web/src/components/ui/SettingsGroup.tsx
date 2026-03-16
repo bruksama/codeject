@@ -12,7 +12,7 @@ export default function SettingsGroup({ title, children, className = '' }: Setti
   return (
     <div className={`mb-5 ${className}`}>
       {title && (
-        <p className="text-xs font-semibold uppercase tracking-widest text-purple-400/70 mb-2 px-1">
+        <p className="accent-text mb-2 px-1 text-xs font-semibold uppercase tracking-widest opacity-80">
           {title}
         </p>
       )}

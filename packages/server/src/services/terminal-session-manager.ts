@@ -207,12 +207,7 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
   async stopSession(sessionId: string) {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return;
-    if (runtime.pollTimer) {
-      clearInterval(runtime.pollTimer);
-    }
-    if (runtime.idleTimer) {
-      clearTimeout(runtime.idleTimer);
-    }
+    this.clearRuntimeTimers(runtime);
     this.runtimes.delete(sessionId);
     await this.tmuxBridge.killSession(runtime.target.sessionName);
     await this.sessionStore.updateSession(sessionId, {
@@ -229,6 +224,32 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
         .filter((session) => session.terminal?.sessionName)
         .map((session) => this.stopSessionByName(session.id, session.terminal!.sessionName!))
     );
+  }
+
+  async cleanupSession(sessionId: string, persistedSessionName?: string) {
+    const runtime = this.runtimes.get(sessionId);
+    if (runtime) {
+      this.clearRuntimeTimers(runtime);
+      this.runtimes.delete(sessionId);
+      await this.tmuxBridge.killSession(runtime.target.sessionName);
+    } else if (persistedSessionName) {
+      await this.tmuxBridge.killSession(persistedSessionName);
+    }
+
+    const canonicalSessionName = buildTmuxSessionName(sessionId);
+    if (
+      canonicalSessionName !== persistedSessionName &&
+      (!runtime || runtime.target.sessionName !== canonicalSessionName)
+    ) {
+      await this.tmuxBridge.killSession(canonicalSessionName);
+    }
+
+    await this.sessionStore.updateSession(sessionId, {
+      lastMessageAt: new Date(),
+      status: 'idle',
+      terminal: undefined,
+    });
+    this.emit('status', sessionId, 'idle');
   }
 
   private async captureSnapshot(sessionId: string, runtime: RuntimeState) {
@@ -262,12 +283,7 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
   }
 
   private async handleDeadPane(sessionId: string, runtime: RuntimeState) {
-    if (runtime.pollTimer) {
-      clearInterval(runtime.pollTimer);
-    }
-    if (runtime.idleTimer) {
-      clearTimeout(runtime.idleTimer);
-    }
+    this.clearRuntimeTimers(runtime);
     this.runtimes.delete(sessionId);
     await this.sessionStore.updateSession(sessionId, {
       lastMessageAt: new Date(),
@@ -349,9 +365,20 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
       void this.stopSession(sessionId);
     }, this.idleTimeoutMs);
   }
+
+  private clearRuntimeTimers(runtime: RuntimeState) {
+    if (runtime.pollTimer) {
+      clearInterval(runtime.pollTimer);
+      runtime.pollTimer = null;
+    }
+    if (runtime.idleTimer) {
+      clearTimeout(runtime.idleTimer);
+      runtime.idleTimer = null;
+    }
+  }
 }
 
-function buildTmuxSessionName(sessionId: string) {
+export function buildTmuxSessionName(sessionId: string) {
   return `codeject-${sessionId}`;
 }
 

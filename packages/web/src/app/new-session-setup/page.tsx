@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { X, Folder, Terminal, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import ProgramIcon from '@/components/ui/program-icon';
 import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
 import { CliProgram } from '@/types';
@@ -52,7 +53,7 @@ function ProgramOption({
           border: `1px solid ${selected ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`,
         }}
       >
-        {program.icon}
+        <ProgramIcon alt={program.name} icon={program.icon} size={22} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-white/90">{program.name}</p>
@@ -71,7 +72,7 @@ const CUSTOM_PROGRAM: CliProgram = {
   id: 'custom',
   name: 'Custom Command',
   command: '',
-  icon: '⚙️',
+  icon: '⌘',
 };
 
 export default function NewSessionSetupPage() {

@@ -12,7 +12,7 @@
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-medium: rgba(255, 255, 255, 0.12);
   --accent-primary: #7c3aed;
-  --accent-secondary: #6366f1;
+  --accent-secondary: #7c3aed;
   --accent-glow: rgba(124, 58, 237, 0.3);
   --text-primary: #f1f0ff;
   --text-secondary: rgba(241, 240, 255, 0.6);
@@ -70,11 +70,11 @@ body {
 
 /* Accent gradient */
 .accent-gradient {
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
 }
 
 .accent-gradient-text {
-  background: linear-gradient(135deg, #a78bfa, #818cf8);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -91,7 +91,7 @@ body {
 
 /* Message bubbles */
 .bubble-user {
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border-radius: 18px 18px 4px 18px;
 }
 
@@ -122,7 +122,7 @@ body {
 
 /* FAB pulse */
 @keyframes fab-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50% { box-shadow: 0 0 0 12px rgba(124, 58, 237, 0); }
 }
 
@@ -218,8 +218,8 @@ body {
 
 /* Input focus glow */
 .input-focus:focus {
-  border-color: rgba(124, 58, 237, 0.6);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+  border-color: color-mix(in srgb, var(--accent-primary) 65%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 16%, transparent);
   outline: none;
 }
 
@@ -264,7 +264,7 @@ body {
 .markdown-content li { margin-bottom: 4px; line-height: 1.5; }
 .markdown-content h1, .markdown-content h2, .markdown-content h3 {
   font-weight: 600; margin: 12px 0 6px;
-  background: linear-gradient(135deg, #a78bfa, #818cf8);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -276,10 +276,10 @@ body {
   border-radius: 4px;
   padding: 1px 5px;
   font-size: 0.85em;
-  color: #a78bfa;
+  color: var(--accent-primary);
 }
 .markdown-content blockquote {
-  border-left: 3px solid #7c3aed;
+  border-left: 3px solid var(--accent-primary);
   padding-left: 12px;
   margin: 8px 0;
   color: rgba(241,240,255,0.6);
@@ -294,4 +294,18 @@ body {
 .color-dot.selected {
   transform: scale(1.15);
   box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 0 12px currentColor;
+}
+
+.accent-chip {
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 24%, transparent);
+  color: color-mix(in srgb, var(--accent-primary) 78%, white);
+}
+
+.accent-dot {
+  background: var(--accent-primary);
+}
+
+.accent-text {
+  color: var(--accent-primary);
 }

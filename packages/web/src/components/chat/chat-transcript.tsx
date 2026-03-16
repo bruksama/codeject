@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { ChatActionCard } from '@/components/chat/chat-action-card';
 import ChatMessage from '@/components/chat/ChatMessage';
+import ProgramIcon from '@/components/ui/program-icon';
 import StreamingIndicator from '@/components/ui/StreamingIndicator';
 import { type ChatState, type Message } from '@/types';
 
@@ -33,7 +34,7 @@ export function ChatTranscript({
   messages,
   onOpenTerminal,
   onSubmitAction,
-  programIcon = '🤖',
+  programIcon = '/assets/program-icons/claude.png',
   programName = 'CLI',
   sessionId,
 }: ChatTranscriptProps) {
@@ -106,7 +107,7 @@ export function ChatTranscript({
     return (
       <div className="flex h-full flex-col items-center justify-center px-5 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-3xl">
-          {programIcon}
+          <ProgramIcon alt={programName} icon={programIcon} size={32} />
         </div>
         <h2 className="text-base font-semibold text-white/90">{programName} is ready</h2>
         <p className="mt-2 max-w-sm text-sm leading-6 text-white/45">
@@ -136,7 +137,7 @@ export function ChatTranscript({
     <div className="relative flex h-full min-h-0 flex-col">
       <div
         ref={scrollContainerRef}
-        className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-14 pt-1"
+        className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-8 pt-1"
         onScroll={syncBottomState}
       >
         {visibleMessages.map((message) =>
@@ -164,8 +165,15 @@ export function ChatTranscript({
       </div>
       {showJumpToLatest ? (
         <button
-          className="glass-elevated absolute bottom-3 left-1/2 flex h-11 min-w-11 -translate-x-1/2 items-center justify-center rounded-full px-3 text-white/90 shadow-[0_12px_30px_rgba(0,0,0,0.32)]"
+          className="absolute bottom-2 left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
           onClick={() => scrollToLatest('smooth')}
+          style={{
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,0.16), color-mix(in srgb, var(--accent-primary) 24%, rgba(10,10,18,0.94)))',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14), 0 16px 36px rgba(0,0,0,0.38)',
+          }}
           type="button"
         >
           <ArrowDown size={18} />

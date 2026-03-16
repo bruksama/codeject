@@ -12,6 +12,7 @@ import { TerminalInputBar } from '@/components/terminal/terminal-input-bar';
 import { TerminalKeyStrip } from '@/components/terminal/terminal-key-strip';
 import { TerminalViewport } from '@/components/terminal/terminal-viewport';
 import ConnectionBadge from '@/components/ui/ConnectionBadge';
+import ProgramIcon from '@/components/ui/program-icon';
 import { useHybridSession } from '@/hooks/use-hybrid-session';
 import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
@@ -99,18 +100,22 @@ export default function ChatInterfacePage() {
       className="flex h-dvh overflow-hidden flex-col bg-[#08080f] px-2.5 pb-3"
       style={{ paddingTop: 'env(safe-area-inset-top, 44px)' }}
     >
-      <header className="mb-2 flex items-center gap-2.5 py-2">
+      <header className="mb-2 flex items-start gap-2 py-2">
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/70"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/70"
           onClick={() => router.push('/sessions-list')}
           type="button"
         >
           <ArrowLeft size={17} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm">{session.cliProgram.icon}</span>
-            <span className="truncate text-[13px] font-semibold text-white/90">{session.name}</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]">
+              <ProgramIcon alt={session.cliProgram.name} icon={session.cliProgram.icon} size={14} />
+            </div>
+            <span className="min-w-0 truncate text-[13px] font-semibold text-white/90">
+              {session.name}
+            </span>
             <ConnectionBadge showLabel size="sm" status={hybrid.status} />
           </div>
           <p className="mt-0.5 truncate font-mono text-[10px] text-white/32">
@@ -118,7 +123,7 @@ export default function ChatInterfacePage() {
           </p>
         </div>
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/70"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/70"
           onClick={() => {
             hybrid.reconnect();
             toast.success(`Reconnecting ${session.cliProgram.name}`);
@@ -129,10 +134,10 @@ export default function ChatInterfacePage() {
         </button>
       </header>
 
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex items-start justify-between gap-2">
         <HybridSurfaceToggle activeMode={hybrid.surfaceMode} onModeChange={hybrid.openSurface} />
-        <div className="truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/42">
-          {session.terminal?.sessionName ? `tmux:${session.terminal.sessionName}` : 'tmux starting'}
+        <div className="max-w-[42vw] truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[10px] text-white/40">
+          {session.terminal?.sessionName ? session.terminal.sessionName : 'tmux starting'}
         </div>
       </div>
 
@@ -165,7 +170,7 @@ export default function ChatInterfacePage() {
           </div>
         ) : (
           <>
-            <div className="glass-card min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] p-3">
+            <div className="glass-card min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] px-3 pb-2 pt-3">
               <ChatTranscript
                 chatState={hybrid.chatState}
                 isSubmittingAction={isSubmittingAction}

@@ -56,9 +56,10 @@ export function createSessionsRoutes(terminalSessionManager: TerminalSessionMana
 
   sessionsRoutes.delete('/:sessionId', async (request, response) => {
     const session = await sessionStore.getSession(request.params.sessionId);
-    if (session?.terminal?.sessionName) {
-      await terminalSessionManager.stopSession(request.params.sessionId);
-    }
+    await terminalSessionManager.cleanupSession(
+      request.params.sessionId,
+      session?.terminal?.sessionName
+    );
     await sessionStore.deleteSession(request.params.sessionId);
     response.status(204).send();
   });

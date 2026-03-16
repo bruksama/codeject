@@ -63,7 +63,7 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 - default bundled programs hiện là `Claude Code`, `OpenAI Codex`, `OpenCode`
 - remote access block đã rút gọn quanh tunnel, public URL, QR, và device auth key
 - accent color đã wire vào token UI thật; default program icons dùng local bundled brand assets
-- browser-level re-verification vẫn còn là bước follow-up
+- browser-level verification đã chạy lại trên mobile viewport; một regression ở active nav với trailing slash đã được sửa
 
 ## Ranh giới hiện tại
 

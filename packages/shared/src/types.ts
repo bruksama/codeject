@@ -182,8 +182,6 @@ export interface AppSettings {
   theme: 'dark' | 'light' | 'system';
   accentColor: string;
   remoteAccess: RemoteAccessSettings;
-  hapticFeedback: boolean;
-  streamingEnabled: boolean;
   fontSize: 'small' | 'medium' | 'large';
 }
 

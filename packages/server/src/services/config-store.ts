@@ -21,9 +21,27 @@ export interface StoredRemoteAccessConfig {
 }
 
 const defaultPrograms: CliProgram[] = [
-  { id: 'claude-code', name: 'Claude Code', command: 'claude', icon: '🤖', defaultWorkingDir: '~/projects' },
-  { id: 'codex', name: 'OpenAI Codex', command: 'codex', icon: '⚡', defaultWorkingDir: '~/projects' },
-  { id: 'aider', name: 'Aider', command: 'aider', icon: '🧠', defaultWorkingDir: '~/projects' },
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    command: 'claude',
+    icon: '/assets/program-icons/claude.png',
+    defaultWorkingDir: '~/projects',
+  },
+  {
+    id: 'codex',
+    name: 'OpenAI Codex',
+    command: 'codex',
+    icon: '/assets/program-icons/codex.png',
+    defaultWorkingDir: '~/projects',
+  },
+  {
+    id: 'opencode',
+    name: 'OpenCode',
+    command: 'opencode',
+    icon: '/assets/program-icons/opencode.png',
+    defaultWorkingDir: '~/projects',
+  },
 ];
 
 const defaultConfig: StoredConfig = {
@@ -45,7 +63,7 @@ export class ConfigStore {
     const stored = await readJsonFile<Partial<StoredConfig>>(environment.configFile, defaultConfig);
     return {
       apiKeyHash: stored.apiKeyHash ?? defaultConfig.apiKeyHash,
-      cliPrograms: stored.cliPrograms ?? defaultConfig.cliPrograms,
+      cliPrograms: normalizePrograms(stored.cliPrograms),
       remoteAccess: {
         ...defaultConfig.remoteAccess,
         ...stored.remoteAccess,
@@ -93,3 +111,57 @@ export class ConfigStore {
 }
 
 export const configStore = new ConfigStore();
+
+function normalizePrograms(cliPrograms?: CliProgram[]) {
+  if (!cliPrograms?.length) {
+    return defaultConfig.cliPrograms;
+  }
+
+  return cliPrograms.map((program) => {
+    if (program.id === 'claude-code') {
+      return {
+        ...program,
+        name: 'Claude Code',
+        command: program.command || 'claude',
+        icon: normalizeKnownProgramIcon(program.icon, '/assets/program-icons/claude.png', [
+          '/assets/program-icons/claude-code.svg',
+        ]),
+      };
+    }
+
+    if (program.id === 'codex') {
+      return {
+        ...program,
+        name: 'OpenAI Codex',
+        command: program.command || 'codex',
+        icon: normalizeKnownProgramIcon(program.icon, '/assets/program-icons/codex.png', [
+          '/assets/program-icons/openai-codex.png',
+        ]),
+      };
+    }
+
+    if (program.id === 'aider' && program.command === 'aider') {
+      return {
+        id: 'opencode',
+        name: 'OpenCode',
+        command: 'opencode',
+        icon: '/assets/program-icons/opencode.png',
+        defaultWorkingDir: program.defaultWorkingDir ?? '~/projects',
+      };
+    }
+
+    return program;
+  });
+}
+
+function normalizeKnownProgramIcon(
+  icon: string | undefined,
+  fallbackIcon: string,
+  legacyIcons: string[] = []
+) {
+  if (!icon || legacyIcons.includes(icon) || /^[^\w/.-]/u.test(icon)) {
+    return fallbackIcon;
+  }
+
+  return icon;
+}

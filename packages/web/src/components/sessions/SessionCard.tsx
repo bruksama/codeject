@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
+import ProgramIcon from '@/components/ui/program-icon';
 import { Session } from '@/types';
 import ConnectionBadge from '@/components/ui/ConnectionBadge';
 import { useAppStore } from '@/stores/useAppStore';
@@ -55,6 +56,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
   const [clockTick, setClockTick] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const swipeStartX = useRef(0);
   const SWIPE_THRESHOLD = 80;
   const MAX_SWIPE = 90;
 
@@ -71,6 +73,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    swipeStartX.current = swipeX;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -78,10 +81,8 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
     const dx = touchStartX.current - e.touches[0].clientX;
     const dy = Math.abs(touchStartY.current - e.touches[0].clientY);
     if (dy > 10 && !isSwiping) return;
-    if (dx > 0) {
-      setIsSwiping(true);
-      setSwipeX(Math.min(dx, MAX_SWIPE));
-    }
+    setIsSwiping(true);
+    setSwipeX(Math.max(0, Math.min(swipeStartX.current + dx, MAX_SWIPE)));
   };
 
   const handleTouchEnd = () => {
@@ -119,16 +120,26 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
       style={{ transition: isDeleting ? 'all 0.35s ease' : undefined }}
     >
       {/* Delete background */}
-      <div
-        className="absolute inset-0 delete-reveal flex items-center justify-end pr-5 rounded-2xl"
-        aria-hidden="true"
-        style={{ opacity: swipeX > 0 ? Math.min(swipeX / SWIPE_THRESHOLD, 1) : 0 }}
+      <button
+        className="absolute inset-0 delete-reveal flex items-center justify-end rounded-2xl pr-5"
+        aria-label={`Delete session ${session.name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (swipeX >= SWIPE_THRESHOLD) {
+            handleDelete();
+          }
+        }}
+        style={{
+          opacity: swipeX > 0 ? Math.min(swipeX / SWIPE_THRESHOLD, 1) : 0,
+          pointerEvents: swipeX >= SWIPE_THRESHOLD ? 'auto' : 'none',
+        }}
+        type="button"
       >
         <div className="flex flex-col items-center gap-1">
           <Trash2 size={20} className="text-white" />
           <span className="text-white text-xs font-medium">Delete</span>
         </div>
-      </div>
+      </button>
 
       {/* Card */}
       <div
@@ -148,28 +159,16 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
           if (e.key === 'Enter') handleOpen();
         }}
       >
-        <button
-          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/6 text-white/55 transition hover:bg-red-500/15 hover:text-red-300"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleDelete();
-          }}
-          aria-label={`Delete session ${session.name}`}
-          type="button"
-        >
-          <Trash2 size={15} />
-        </button>
-
         <div className="flex items-start gap-3">
           {/* Program icon */}
           <div
             className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
             style={{
-              background: 'rgba(124,58,237,0.12)',
-              border: '1px solid rgba(124,58,237,0.2)',
+              background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
             }}
           >
-            <span>{session.cliProgram.icon}</span>
+            <ProgramIcon alt={session.cliProgram.name} icon={session.cliProgram.icon} size={22} />
           </div>
 
           {/* Content */}
@@ -183,7 +182,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
             </div>
 
             <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-[11px] font-medium text-purple-400/70 truncate">
+              <span className="accent-text truncate text-[11px] font-medium opacity-80">
                 {session.cliProgram.name}
               </span>
               <span className="text-white/20 text-[10px]">•</span>
@@ -195,20 +194,6 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
             <p className="text-xs text-white/40 leading-relaxed line-clamp-2">{preview}</p>
           </div>
         </div>
-
-        {/* Message count + delete button (on swipe) */}
-        {swipeX > 30 && (
-          <button
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete();
-            }}
-            aria-label="Delete session"
-          >
-            <Trash2 size={16} className="text-red-400" />
-          </button>
-        )}
       </div>
     </div>
   );

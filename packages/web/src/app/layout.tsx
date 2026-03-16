@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import '@/styles/tailwind.css';
 import { Toaster } from 'sonner';
+import AccentThemeSync from '@/components/ui/accent-theme-sync';
 
 export const metadata: Metadata = {
   title: 'Codeject',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body style={{ background: '#08080f' }}>
+        <AccentThemeSync />
         {children}
         <Toaster
           position="bottom-center"

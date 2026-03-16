@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import ProgramIcon from '@/components/ui/program-icon';
 import { Message } from '@/types';
 import CodeBlock from './CodeBlock';
 
@@ -60,7 +61,7 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
       if (line.startsWith('- ') || line.startsWith('* ')) {
         return (
           <div key={i} className="flex gap-2">
-            <span className="text-purple-400 mt-0.5 flex-shrink-0">•</span>
+            <span className="accent-text mt-0.5 flex-shrink-0">•</span>
             <span>{renderInlineText(line.slice(2))}</span>
           </div>
         );
@@ -71,7 +72,7 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
       if (numMatch) {
         return (
           <div key={i} className="flex gap-2">
-            <span className="text-purple-400 flex-shrink-0 font-medium text-xs mt-0.5 w-4">
+            <span className="accent-text mt-0.5 w-4 flex-shrink-0 text-xs font-medium">
               {numMatch[1]}.
             </span>
             <span>{renderInlineText(numMatch[2])}</span>
@@ -150,16 +151,21 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
       {!isUser && (
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 self-end mb-1"
-          style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)' }}
+          style={{
+            background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent-primary) 26%, transparent)',
+          }}
         >
-          <span>{programIcon}</span>
+          <ProgramIcon alt="Program" icon={programIcon} size={18} />
         </div>
       )}
 
-      <div className={`flex flex-col gap-1 max-w-[82%] ${isUser ? 'items-end' : 'items-start'}`}>
+      <div
+        className={`flex min-w-0 flex-col gap-1 max-w-[82%] ${isUser ? 'items-end' : 'items-start'}`}
+      >
         {/* Bubble */}
         <div
-          className={`px-4 py-3 ${isUser ? 'bubble-user text-white' : 'bubble-assistant text-white/90'}`}
+          className={`max-w-full overflow-hidden px-4 py-3 ${isUser ? 'bubble-user text-white' : 'bubble-assistant text-white/90'}`}
           style={{ wordBreak: 'break-word' }}
         >
           {isUser ? (

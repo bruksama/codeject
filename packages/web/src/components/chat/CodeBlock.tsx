@@ -252,7 +252,7 @@ export default function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
   const label = languageLabels[language.toLowerCase()] || language.toUpperCase();
 
   return (
-    <div className="code-block my-2 overflow-hidden">
+    <div className="code-block my-2 max-w-full overflow-hidden">
       {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-2 border-b border-white/8"
@@ -278,8 +278,8 @@ export default function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
         </button>
       </div>
       {/* Code content */}
-      <div className="overflow-x-auto p-4">
-        <pre className="text-sm leading-relaxed font-mono whitespace-pre">
+      <div className="max-w-full overflow-x-auto p-4">
+        <pre className="min-w-full text-sm leading-relaxed font-mono whitespace-pre">
           {tokenize(code, language.toLowerCase())}
         </pre>
       </div>

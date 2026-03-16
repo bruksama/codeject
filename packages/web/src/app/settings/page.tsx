@@ -8,16 +8,13 @@ import {
   Info,
   Plus,
   ChevronRight,
-  QrCode,
   Eye,
   EyeOff,
   Copy,
   Check,
   Github,
   FileText,
-  Zap,
   Type,
-  Vibrate,
   AlertTriangle,
   X,
   Play,
@@ -29,6 +26,7 @@ import { toast } from 'sonner';
 import { useSessionApi } from '@/hooks/use-session-api';
 import AppLogo from '@/components/ui/AppLogo';
 import BottomTabBar from '@/components/ui/BottomTabBar';
+import ProgramIcon from '@/components/ui/program-icon';
 import QrCodeGraphic from '@/components/ui/qr-code';
 import SettingsGroup from '@/components/ui/SettingsGroup';
 import SettingsItem from '@/components/ui/SettingsItem';
@@ -231,7 +229,7 @@ export default function SettingsPage() {
   const [tunnelDetails, setTunnelDetails] = useState<TunnelStatusResponse | null>(null);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
 
-  const { remoteAccess, hapticFeedback, streamingEnabled, fontSize, accentColor } = settings;
+  const { remoteAccess, fontSize, accentColor } = settings;
 
   useEffect(() => {
     void sessionApi.loadCliPrograms().catch(() => undefined);
@@ -382,7 +380,7 @@ export default function SettingsPage() {
           {cliPrograms.map((program, i) => (
             <SettingsItem
               key={program.id}
-              icon={<span className="text-lg">{program.icon}</span>}
+              icon={<ProgramIcon alt={program.name} icon={program.icon} size={18} />}
               label={program.name}
               sublabel={program.command}
               type="disclosure"
@@ -391,7 +389,7 @@ export default function SettingsPage() {
             />
           ))}
           <SettingsItem
-            icon={<Plus size={16} className="text-purple-400" />}
+            icon={<Plus size={16} className="accent-text" />}
             label="Add CLI Program"
             type="disclosure"
             showDivider={false}
@@ -401,24 +399,15 @@ export default function SettingsPage() {
 
         {/* Remote Access */}
         <SettingsGroup title="Remote Access">
-          <SettingsItem
-            icon={<Wifi size={16} className="text-purple-400" />}
-            label="API Key Status"
-            sublabel="Remote requests require a bearer token"
-            type="value"
-            value={remoteAccess.enabled ? 'Configured' : 'Missing'}
-            showDivider
-          />
-
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{
-                background: 'rgba(124,58,237,0.15)',
-                border: '1px solid rgba(124,58,237,0.2)',
+                background: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-primary) 24%, transparent)',
               }}
             >
-              <Zap size={14} className="text-purple-400" />
+              <Wifi size={14} className="accent-text" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/90">Cloudflare Tunnel</p>
@@ -515,20 +504,45 @@ export default function SettingsPage() {
             <div
               className="rounded-2xl px-3 py-3"
               style={{
-                background: 'rgba(124,58,237,0.08)',
-                border: '1px solid rgba(124,58,237,0.18)',
+                background: 'color-mix(in srgb, var(--accent-primary) 9%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-primary) 18%, transparent)',
               }}
             >
               <div className="flex items-center gap-2">
-                <KeyRound size={14} className="text-purple-300" />
+                <KeyRound size={14} className="accent-text" />
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-                  Phone Auth
+                  Device Auth
                 </p>
               </div>
-              <p className="text-xs text-white/50 mt-2">
-                QR opens the public URL only. Paste the bearer key on the phone once, then REST and
-                WebSocket requests use it from browser storage.
+              <p className="mt-2 text-xs text-white/50">
+                QR shares only the public URL. Save the bearer key on this device once to unlock
+                remote REST and WebSocket calls.
               </p>
+              <div className="mt-3 rounded-xl border border-white/8 bg-white/5">
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-b border-white/8">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                      Browser Key
+                    </p>
+                    <p className="mt-1 text-[11px] text-white/40">
+                      {remoteAccess.enabled
+                        ? 'Configured for remote access'
+                        : 'Rotate locally to create one'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      void handleRotateKey();
+                    }}
+                    className="accent-chip rounded-lg border px-3 py-1.5 text-xs font-medium"
+                    disabled={isRotatingKey}
+                    type="button"
+                  >
+                    {isRotatingKey ? 'Rotating…' : 'Rotate'}
+                  </button>
+                </div>
+                <AuthKeyDisplay authKey={remoteAccess.authKey} />
+              </div>
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/5 border border-white/8 px-3 py-2">
                 <input
                   value={storedAuthKeyInput}
@@ -551,6 +565,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => void handleSaveStoredKey()}
                   className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/80 bg-white/8"
+                  type="button"
                 >
                   Save
                 </button>
@@ -569,38 +584,6 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-
-          <div className="border-b border-white/5">
-            <div className="flex items-center gap-3 px-4 py-2.5">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: 'rgba(124,58,237,0.15)',
-                  border: '1px solid rgba(124,58,237,0.2)',
-                }}
-              >
-                <Eye size={14} className="text-purple-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white/90">Latest Rotated Key</p>
-                <p className="text-xs text-white/35 mt-0.5">
-                  Stored only in this browser after a local rotate request
-                </p>
-              </div>
-            </div>
-            <AuthKeyDisplay authKey={remoteAccess.authKey} />
-          </div>
-
-          <SettingsItem
-            icon={<QrCode size={16} className="text-purple-400" />}
-            label={isRotatingKey ? 'Rotating API Key…' : 'Rotate API Key'}
-            sublabel="Generates a new bearer token from the local backend"
-            type="disclosure"
-            showDivider={false}
-            onClick={() => {
-              void handleRotateKey();
-            }}
-          />
         </SettingsGroup>
 
         {/* Appearance */}
@@ -614,11 +597,11 @@ export default function SettingsPage() {
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: 'rgba(124,58,237,0.15)',
-                  border: '1px solid rgba(124,58,237,0.2)',
+                  background: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-primary) 24%, transparent)',
                 }}
               >
-                <Palette size={15} className="text-purple-400" />
+                <Palette size={15} className="accent-text" />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white/90">Accent Color</p>
@@ -646,53 +629,26 @@ export default function SettingsPage() {
 
           {/* Font size */}
           <SettingsItem
-            icon={<Type size={16} className="text-purple-400" />}
+            icon={<Type size={16} className="accent-text" />}
             label="Font Size"
             type="value"
             value={fontSizeLabels[fontSize]}
             showDivider
             onClick={handleFontSizeCycle}
           />
-
-          {/* Streaming */}
-          <SettingsItem
-            icon={<Zap size={16} className="text-purple-400" />}
-            label="Streaming Responses"
-            sublabel="Show responses as they're generated"
-            type="toggle"
-            checked={streamingEnabled}
-            onToggle={(v) => {
-              updateSettings({ streamingEnabled: v });
-              toast.success(v ? 'Streaming enabled' : 'Streaming disabled');
-            }}
-            showDivider
-          />
-
-          {/* Haptic feedback */}
-          <SettingsItem
-            icon={<Vibrate size={16} className="text-purple-400" />}
-            label="Haptic Feedback"
-            sublabel="Vibration on send and receive"
-            type="toggle"
-            checked={hapticFeedback}
-            onToggle={(v) => {
-              updateSettings({ hapticFeedback: v });
-            }}
-            showDivider={false}
-          />
         </SettingsGroup>
 
         {/* About */}
         <SettingsGroup title="About">
           <SettingsItem
-            icon={<Info size={16} className="text-purple-400" />}
+            icon={<Info size={16} className="accent-text" />}
             label="Version"
             type="value"
             value="1.0.0 (build 42)"
             showDivider
           />
           <SettingsItem
-            icon={<Github size={16} className="text-purple-400" />}
+            icon={<Github size={16} className="accent-text" />}
             label="GitHub Repository"
             sublabel="github.com/codeject/codeject"
             type="disclosure"
@@ -700,14 +656,14 @@ export default function SettingsPage() {
             onClick={() => toast.info('Opening GitHub…')}
           />
           <SettingsItem
-            icon={<FileText size={16} className="text-purple-400" />}
+            icon={<FileText size={16} className="accent-text" />}
             label="Licenses"
             type="disclosure"
             showDivider
             onClick={() => toast.info('Open source licenses')}
           />
           <SettingsItem
-            icon={<FileText size={16} className="text-purple-400" />}
+            icon={<FileText size={16} className="accent-text" />}
             label="Privacy Policy"
             type="disclosure"
             showDivider={false}
@@ -780,11 +736,11 @@ export default function SettingsPage() {
               <div
                 className="w-full rounded-xl px-4 py-3 flex items-center gap-2"
                 style={{
-                  background: 'rgba(124,58,237,0.1)',
-                  border: '1px solid rgba(124,58,237,0.2)',
+                  background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
                 }}
               >
-                <Eye size={13} className="text-purple-400 flex-shrink-0" />
+                <Eye size={13} className="accent-text flex-shrink-0" />
                 <p className="text-xs text-white/50">
                   QR does not include the bearer key. Share the key separately.
                 </p>

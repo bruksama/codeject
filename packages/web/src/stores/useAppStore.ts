@@ -19,14 +19,12 @@ const defaultState = {
   settings: {
     accentColor: '#7c3aed',
     fontSize: 'medium' as const,
-    hapticFeedback: true,
     remoteAccess: {
       authKey: '',
       enabled: false,
       tunnelStatus: 'inactive' as const,
       tunnelUrl: undefined,
     },
-    streamingEnabled: true,
     theme: 'dark' as const,
   },
 };

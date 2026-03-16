@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { X, Terminal, Folder, AlertCircle, Trash2, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import ProgramIcon from '@/components/ui/program-icon';
 import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -178,25 +179,27 @@ function CliProgramEditorContent() {
   const existingProgram = cliPrograms.find((p) => p.id === programId);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedIcon, setSelectedIcon] = useState(existingProgram?.icon || '🤖');
+  const [selectedIcon, setSelectedIcon] = useState(
+    existingProgram?.icon || '/assets/program-icons/claude.png'
+  );
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CliProgramFormData>({
     defaultValues: {
       name: existingProgram?.name || '',
       command: existingProgram?.command || '',
-      icon: existingProgram?.icon || '🤖',
+      icon: existingProgram?.icon || '/assets/program-icons/claude.png',
       defaultWorkingDir: existingProgram?.defaultWorkingDir || '~/projects',
     },
   });
 
-  const commandValue = watch('command');
+  const commandValue = useWatch({ control, name: 'command' });
 
   useEffect(() => {
     setValue('icon', selectedIcon);
@@ -290,7 +293,7 @@ function CliProgramEditorContent() {
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-150 active:scale-95 ${
+                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 ${
                   showEmojiPicker
                     ? 'border-purple-500/50 bg-purple-500/15'
                     : 'bg-white/5 border border-white/10 hover:bg-white/8'
@@ -299,7 +302,7 @@ function CliProgramEditorContent() {
                 aria-label="Change icon"
                 aria-expanded={showEmojiPicker}
               >
-                {selectedIcon}
+                <ProgramIcon alt="Program icon" icon={selectedIcon} size={30} />
               </button>
               <div>
                 <p className="text-sm font-medium text-white/70">Program Icon</p>
