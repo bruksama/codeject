@@ -50,6 +50,10 @@ export default function ChatInterfacePage() {
     setChatDraft('');
   }, [chatDraft, hybrid]);
 
+  const handleInterrupt = useCallback(() => {
+    hybrid.interruptPrompt();
+  }, [hybrid]);
+
   const handleTerminalSubmit = useCallback(
     (value: string) => {
       if (!hybrid.sendTerminalInput(value)) {
@@ -94,6 +98,9 @@ export default function ChatInterfacePage() {
   const showTerminal = hybrid.surfaceMode === 'terminal';
   const isSubmittingAction =
     Boolean(pendingActionId) && pendingActionId === hybrid.chatState?.actionRequest?.id;
+  const isHandlingPrompt =
+    hybrid.chatState?.phase === 'awaiting-assistant' ||
+    hybrid.chatState?.phase === 'streaming-assistant';
 
   return (
     <div
@@ -169,8 +176,8 @@ export default function ChatInterfacePage() {
             />
           </div>
         ) : (
-          <>
-            <div className="glass-card min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] px-3 pb-2 pt-3">
+          <div className="relative min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] px-3 pb-2 pt-3">
+            <div className="min-h-0 h-full">
               <ChatTranscript
                 chatState={hybrid.chatState}
                 isSubmittingAction={isSubmittingAction}
@@ -183,13 +190,16 @@ export default function ChatInterfacePage() {
               />
             </div>
             <ChatComposer
+              className="absolute inset-x-3 bottom-3 z-20"
               disabled={hybrid.status === 'error'}
               errorMessage={hybrid.lastError}
+              isBusy={isHandlingPrompt}
+              onInterrupt={handleInterrupt}
               onSubmit={handleChatSubmit}
               onValueChange={setChatDraft}
               value={chatDraft}
             />
-          </>
+          </div>
         )}
       </div>
     </div>

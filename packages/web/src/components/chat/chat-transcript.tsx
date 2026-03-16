@@ -27,6 +27,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 const BOTTOM_THRESHOLD_PX = 96;
+const COMPOSER_CLEARANCE_PX = 58;
 
 export function ChatTranscript({
   chatState,
@@ -137,7 +138,10 @@ export function ChatTranscript({
     <div className="relative flex h-full min-h-0 flex-col">
       <div
         ref={scrollContainerRef}
-        className="flex h-full flex-col gap-4 overflow-y-auto px-1 pb-8 pt-1"
+        className="flex h-full flex-col gap-4 overflow-y-auto px-1 pt-1"
+        style={{
+          paddingBottom: `calc(${COMPOSER_CLEARANCE_PX}px + env(safe-area-inset-bottom, 0px))`,
+        }}
         onScroll={syncBottomState}
       >
         {visibleMessages.map((message) =>
@@ -165,7 +169,7 @@ export function ChatTranscript({
       </div>
       {showJumpToLatest ? (
         <button
-          className="absolute bottom-2 left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
+          className="absolute bottom-[calc(74px+env(safe-area-inset-bottom,0px))] left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
           onClick={() => scrollToLatest('smooth')}
           style={{
             backdropFilter: 'blur(28px)',

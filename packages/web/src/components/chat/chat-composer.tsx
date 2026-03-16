@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SendHorizontal } from 'lucide-react';
+import { SendHorizontal, Square } from 'lucide-react';
 
 interface ChatComposerProps {
+  className?: string;
   disabled?: boolean;
   errorMessage?: string | null;
+  isBusy?: boolean;
+  onInterrupt?: () => void;
   onSubmit: () => void;
   onValueChange: (value: string) => void;
   value: string;
@@ -15,14 +18,18 @@ const IDLE_HEIGHT = 40;
 const EXPANDED_HEIGHT = 112;
 
 export function ChatComposer({
+  className = '',
   disabled = false,
   errorMessage,
+  isBusy = false,
+  onInterrupt,
   onSubmit,
   onValueChange,
   value,
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [prefersTouchInput, setPrefersTouchInput] = useState(false);
 
   useEffect(() => {
     const element = textareaRef.current;
@@ -36,15 +43,37 @@ export function ChatComposer({
     element.style.height = `${nextHeight}px`;
   }, [isFocused, value]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const mediaQuery = window.matchMedia('(pointer: coarse)');
+    const updatePreference = () => setPrefersTouchInput(mediaQuery.matches);
+    updatePreference();
+
+    mediaQuery.addEventListener('change', updatePreference);
+    return () => mediaQuery.removeEventListener('change', updatePreference);
+  }, []);
+
   const canSubmit = !disabled && value.trim().length > 0;
   const isExpanded = isFocused || value.includes('\n');
+  const canInterrupt = !disabled && isBusy && Boolean(onInterrupt);
 
   return (
-    <div className="glass-card rounded-[20px] border border-white/10 px-3 pb-3 pt-2.5">
+    <div className={className}>
       <div
-        className={`flex items-end gap-2 rounded-[18px] border border-white/10 bg-white/[0.04] px-2.5 py-2 transition-all duration-200 ${
-          isExpanded ? 'border-white/14 bg-white/[0.06]' : ''
-        }`}
+        className="isolate flex items-end gap-2 overflow-hidden rounded-[20px] px-2.5 py-2 transition-all duration-200 shadow-[0_16px_36px_rgba(0,0,0,0.26)]"
+        style={{
+          backdropFilter: 'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          transform: 'translateZ(0)',
+          willChange: 'transform',
+          contain: 'paint',
+          background: isExpanded
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.12), color-mix(in srgb, var(--accent-primary) 16%, rgba(10,10,18,0.92)))'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.1), color-mix(in srgb, var(--accent-primary) 14%, rgba(10,10,18,0.9)))',
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.08), 0 16px 36px rgba(0,0,0,0.26)',
+        }}
       >
         <textarea
           ref={textareaRef}
@@ -54,6 +83,14 @@ export function ChatComposer({
           onChange={(event) => onValueChange(event.target.value)}
           onFocus={() => setIsFocused(true)}
           onKeyDown={(event) => {
+            if (prefersTouchInput) {
+              return;
+            }
+
+            if (isBusy) {
+              return;
+            }
+
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
               if (canSubmit) {
@@ -66,13 +103,28 @@ export function ChatComposer({
           value={value}
         />
         <button
-          className={`accent-gradient flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white transition-all duration-200 active:scale-[0.98] ${
-            canSubmit ? 'opacity-100' : 'pointer-events-none opacity-45'
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white transition-all duration-200 active:scale-[0.98] ${
+            canInterrupt || canSubmit ? 'opacity-100' : 'pointer-events-none opacity-45'
           } ${isExpanded ? 'h-11 w-11' : ''}`}
-          onClick={onSubmit}
+          onClick={canInterrupt ? onInterrupt : onSubmit}
+          style={
+            canInterrupt
+              ? {
+                  background:
+                    'linear-gradient(135deg, rgba(239,68,68,0.92), color-mix(in srgb, var(--accent-primary) 22%, rgba(239,68,68,0.76)))',
+                }
+              : {
+                  background:
+                    'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                }
+          }
           type="button"
         >
-          <SendHorizontal size={17} />
+          {canInterrupt ? (
+            <Square fill="currentColor" size={14} strokeWidth={2.2} />
+          ) : (
+            <SendHorizontal size={17} />
+          )}
         </button>
       </div>
       {errorMessage ? <p className="px-1 pt-2 text-xs text-red-400/85">{errorMessage}</p> : null}

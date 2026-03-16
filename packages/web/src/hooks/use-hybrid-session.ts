@@ -211,6 +211,32 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
         updateSession(sessionId, { surfaceMode: mode });
         clientRef.current?.send({ mode, type: 'surface:set-mode' });
       },
+      interruptPrompt() {
+        if (!sessionId) return;
+        const timestamp = new Date();
+        const nextPhase = state.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
+        const nextChatState = state.chatState
+          ? {
+              ...state.chatState,
+              actionRequest: undefined,
+              lastAssistantMessageId: undefined,
+              phase: nextPhase,
+              terminalRequiredReason: undefined,
+              transcriptUpdatedAt: timestamp,
+            }
+          : undefined;
+
+        setState((current) => ({
+          ...current,
+          chatState: nextChatState,
+          optimisticPrompt: undefined,
+        }));
+        updateSession(sessionId, { chatState: nextChatState });
+        clientRef.current?.send({ key: 'Escape', type: 'terminal:key' });
+        window.setTimeout(() => {
+          clientRef.current?.send({ key: 'Escape', type: 'terminal:key' });
+        }, 90);
+      },
       reconnect() {
         setState((current) => ({ ...current, lastError: null }));
         clientRef.current?.reconnect();

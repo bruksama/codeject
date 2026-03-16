@@ -18,7 +18,7 @@ export default function FloatingActionButton({
       aria-label={label}
       className="fixed z-40 accent-gradient accent-glow fab-pulse rounded-full shadow-2xl active:scale-90 transition-transform duration-150"
       style={{
-        bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
+        bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
         right: '20px',
         width: 56,
         height: 56,
