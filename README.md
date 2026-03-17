@@ -21,10 +21,13 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Terminal surface làm đường lui chính xác khi cần thao tác sâu.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
 - Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
+- Hỗ trợ quick tunnel mặc định và named tunnel token-based cho domain riêng.
 
 ## Demo nhanh
 
-_Gợi ý_: thêm 1–2 screenshot hoặc GIF minh họa UI trên điện thoại và desktop.
+Ảnh chụp giao diện tạo session trong web app:
+
+![Codeject web app screenshot](./docs/assets/images/readme-landing.png)
 
 ## Cài đặt và chạy nhanh
 
@@ -65,6 +68,8 @@ Chi tiết hơn xem `docs/getting-started.md`.
 4. Khi cần thao tác chi tiết:
    - Chuyển sang terminal surface để gửi lệnh trực tiếp.
 5. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
+   - Quick tunnel: zero-setup, URL tạm.
+   - Named tunnel: URL cố định trên domain Cloudflare của bạn.
 
 Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.md`.
 
@@ -125,4 +130,3 @@ Tài liệu tối ưu cho LLM:
 - HTTP API: `docs/llm/api-reference.md`
 - WebSocket protocol: `docs/llm/websocket-spec.md`
 - Coding standards cho agent: `docs/llm/coding-standards.md`
-

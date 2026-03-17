@@ -31,6 +31,8 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
 
 1. Đảm bảo host đã cài `cloudflared`.
 2. Trong Codeject, mở phần điều khiển remote access:
+   - Chọn `Quick` nếu chỉ cần URL tạm.
+   - Hoặc chọn `Named`, nhập hostname + token nếu muốn dùng domain riêng.
    - Start Cloudflare Tunnel.
    - Lấy public URL và/hoặc quét QR code.
 3. Trên điện thoại:
@@ -61,4 +63,3 @@ Lưu ý bảo mật:
 2. Nếu muốn xóa toàn bộ dữ liệu:
    - Xóa thư mục `~/.codeject` (hoặc thư mục được trỏ bởi `CODEJECT_HOME`).
    - Lưu ý: thao tác này sẽ xóa toàn bộ config và session đã lưu.
-

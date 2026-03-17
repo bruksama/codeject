@@ -1,10 +1,15 @@
 'use client';
 
-import { type CliProgram, type ConnectionStatus, type Message, type Session } from '@/types';
+import {
+  type CliProgram,
+  type ConnectionStatus,
+  type Message,
+  type Session,
+  type TunnelLifecycleState,
+  type TunnelMode,
+} from '@/types';
 
 const API_KEY_STORAGE_KEY = 'codeject-api-key';
-
-export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
 
 export interface TunnelStatusResponse {
   authConfigured: boolean;
@@ -14,9 +19,18 @@ export interface TunnelStatusResponse {
   isDevelopment: boolean;
   lastError?: string;
   managedPid?: number;
+  namedTunnelHostname?: string;
+  namedTunnelTokenConfigured: boolean;
   publicUrl?: string;
   startedAt?: string;
+  tunnelMode: TunnelMode;
   status: TunnelLifecycleState;
+}
+
+export interface TunnelConfigurationInput {
+  namedTunnelHostname?: string;
+  namedTunnelToken?: string;
+  tunnelMode: TunnelMode;
 }
 
 export class ApiError extends Error {
@@ -226,6 +240,14 @@ export const apiClient = {
       method: 'POST',
     });
     return payload.cliProgram;
+  },
+
+  async saveTunnelConfiguration(input: TunnelConfigurationInput) {
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel/config', {
+      body: JSON.stringify(input),
+      method: 'PUT',
+    });
+    return payload.tunnel;
   },
 
   async startTunnel() {

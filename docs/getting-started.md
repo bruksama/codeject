@@ -56,8 +56,11 @@ Trong chế độ này, frontend và backend chạy song song, hot reload cho vi
 Nếu host đã cài `cloudflared`, bạn có thể bật remote access để truy cập Codeject từ điện thoại:
 
 - UI cung cấp điều khiển để:
+  - Chọn `Quick` hoặc `Named`.
   - Bật / tắt / restart Cloudflare Tunnel.
   - Xem public URL và QR code.
+- `Quick` phù hợp khi cần chạy nhanh, không cần domain riêng.
+- `Named` phù hợp khi bạn đã có tunnel token và hostname trên Cloudflare.
 - Lưu ý:
   - Request **không local** bắt buộc phải gửi `Authorization: Bearer <key>`.
   - QR chỉ chứa public URL, **không chứa secret**.
@@ -75,4 +78,3 @@ Chi tiết thêm xem trong `docs/deployment-guide.md` và `docs/usage-recipes.md
 - **Cloudflared chưa cài**:
   - Triệu chứng: chức năng tunnel báo lỗi khi start.
   - Cách xử lý: cài `cloudflared` hoặc tắt remote access.
-

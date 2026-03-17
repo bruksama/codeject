@@ -56,6 +56,33 @@ Remote access được cung cấp thông qua `cloudflared`.
 - Request không local phải dùng bearer key.
 - QR chỉ chứa public URL, không chứa secret.
 
+Hai mode được hỗ trợ:
+
+- `Quick`: không cần cấu hình Cloudflare trước, nhận URL `trycloudflare.com` mới mỗi lần start.
+- `Named (token-based)`: dùng hostname cố định trên domain Cloudflare của bạn và tunnel token lưu trong Codeject.
+
+### Named tunnel token-based
+
+Chuẩn bị trên Cloudflare:
+
+1. Tạo một named tunnel trong Cloudflare Zero Trust.
+2. Tạo public hostname, ví dụ `codeject.example.com`, trỏ vào tunnel đó.
+3. Lấy tunnel token cho tunnel vừa tạo.
+
+Thiết lập trong Codeject:
+
+1. Mở `Settings` → `Remote Access`.
+2. Chọn mode `Named`.
+3. Nhập hostname public, ví dụ `codeject.example.com`.
+4. Dán tunnel token rồi bấm `Save named tunnel`.
+5. Start tunnel như bình thường.
+
+Ghi chú:
+
+- Token được lưu local trong `~/.codeject/config.json`.
+- Token không được trả lại qua API status và không được hiển thị lại trong UI.
+- Auth Internet-facing vẫn dùng bearer key hiện có của Codeject, không dùng Cloudflare Access trong scope hiện tại.
+
 ## Ghi chú vận hành
 
 - Production entrypoint là server Express trong `packages/server`.

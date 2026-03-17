@@ -14,7 +14,9 @@ export type {
   Session,
   SurfaceMode,
   SurfaceRequirement,
+  TunnelLifecycleState,
   TerminalKey,
   TerminalRuntime,
   TerminalSnapshot,
+  TunnelMode,
 } from '@codeject/shared';

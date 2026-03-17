@@ -22,6 +22,9 @@ const defaultState = {
     remoteAccess: {
       authKey: '',
       enabled: false,
+      namedTunnelHostname: undefined,
+      namedTunnelTokenConfigured: false,
+      tunnelMode: 'quick' as const,
       tunnelStatus: 'inactive' as const,
       tunnelUrl: undefined,
     },

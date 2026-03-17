@@ -1,4 +1,4 @@
-import { CliProgram } from '@codeject/shared';
+import { CliProgram, type TunnelLifecycleState, type TunnelMode } from '@codeject/shared';
 import { environment } from '../config/environment.js';
 import { readJsonFile, writeJsonFile } from './file-system-store.js';
 
@@ -8,14 +8,15 @@ interface StoredConfig {
   remoteAccess: StoredRemoteAccessConfig;
 }
 
-export type TunnelLifecycleState = 'inactive' | 'starting' | 'active' | 'stopping' | 'error';
-
 export interface StoredRemoteAccessConfig {
   autoStart: boolean;
   enabled: boolean;
   lastError: string | null;
   managedPid: number | null;
+  namedTunnelHostname: string | null;
+  namedTunnelToken: string | null;
   startedAt: string | null;
+  tunnelMode: TunnelMode;
   tunnelStatus: TunnelLifecycleState;
   tunnelUrl: string | null;
 }
@@ -52,13 +53,18 @@ const defaultConfig: StoredConfig = {
     enabled: false,
     lastError: null,
     managedPid: null,
+    namedTunnelHostname: null,
+    namedTunnelToken: null,
     startedAt: null,
+    tunnelMode: 'quick',
     tunnelStatus: 'inactive',
     tunnelUrl: null,
   },
 };
 
 export class ConfigStore {
+  private updateQueue: Promise<unknown> = Promise.resolve();
+
   async read() {
     const stored = await readJsonFile<Partial<StoredConfig>>(environment.configFile, defaultConfig);
     return {
@@ -72,9 +78,19 @@ export class ConfigStore {
   }
 
   async update(updater: (config: StoredConfig) => StoredConfig) {
-    const nextConfig = updater(await this.read());
-    await writeJsonFile(environment.configFile, nextConfig);
-    return nextConfig;
+    const runUpdate = async () => {
+      const nextConfig = updater(await this.read());
+      await writeJsonFile(environment.configFile, nextConfig);
+      return nextConfig;
+    };
+
+    const pendingUpdate = this.updateQueue.then(runUpdate, runUpdate);
+    this.updateQueue = pendingUpdate.then(
+      () => undefined,
+      () => undefined
+    );
+
+    return pendingUpdate;
   }
 
   async listPrograms() {

@@ -42,7 +42,10 @@
 
 - Role: provide a public URL for the local web server.
 - Managed by a dedicated tunnel manager service in the server.
-- Exposed via `/api/tunnel` endpoints for status, start, stop, restart.
+- Supports two modes:
+  - `quick`: ephemeral `trycloudflare.com` URL discovered from runtime output
+  - `named-token`: fixed hostname derived from saved config, started with a saved tunnel token
+- Exposed via `/api/tunnel` endpoints for status, start, stop, restart, and config update.
 
 ## Data and persistence
 
@@ -65,7 +68,7 @@
 ### Remote access flow
 
 1. User enables tunnel via `/api/tunnel/start`.
-2. Server starts a `cloudflared` process bound to the local server.
+2. Server starts a `cloudflared` process in either quick or named-token mode.
 3. Tunnel state and public URL are exposed via `/api/tunnel`.
 4. Non-local requests coming through the tunnel must present a valid bearer token.
 
@@ -75,4 +78,3 @@
 - Remote access **requires** `cloudflared` on the host.
 - Runtime source of truth is tmux; chat transcript is derived UX state.
 - Local requests bypass auth; non-local always require bearer auth.
-

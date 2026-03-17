@@ -42,10 +42,11 @@ This document lists the main REST API endpoints exposed by the server. It is int
 
 - `GET /api/tunnel`
   - Purpose: read current tunnel status and public URL.
+- `PUT /api/tunnel/config`
+  - Purpose: save tunnel mode and named tunnel settings.
 - `POST /api/tunnel/start`
   - Purpose: start the Cloudflare Tunnel process.
 - `POST /api/tunnel/stop`
   - Purpose: stop the tunnel.
 - `POST /api/tunnel/restart`
   - Purpose: restart the tunnel.
-

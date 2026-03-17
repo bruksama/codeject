@@ -91,7 +91,11 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 ## Remote access
 
 - remote access thông qua `cloudflared`
+- hỗ trợ hai mode:
+  - `quick`: parse runtime URL `trycloudflare.com`
+  - `named-token`: dùng hostname cố định và token lưu trong config local
 - backend cung cấp `/api/tunnel` để xem trạng thái, start, stop, restart
+- backend cung cấp `PUT /api/tunnel/config` để lưu mode, hostname, và token
 - proxy-aware auth kiểm tra IP thực khi đi qua tunnel
 
 ## Ranh giới và hạn chế

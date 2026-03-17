@@ -1,10 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import type { TunnelLifecycleState, TunnelMode } from '@codeject/shared';
 import { authService } from './auth-service.js';
-import { configStore, type StoredRemoteAccessConfig, type TunnelLifecycleState } from './config-store.js';
+import { configStore, type StoredRemoteAccessConfig } from './config-store.js';
 import { environment } from '../config/environment.js';
 import { logger } from '../utils/logger.js';
 
 const TUNNEL_URL_PATTERN = /(https:\/\/[a-z0-9.-]+\.trycloudflare\.com)/i;
+const MAX_TUNNEL_LOG_LINES = 12;
+const NAMED_TUNNEL_STARTUP_GRACE_MS = 1_200;
 
 export interface TunnelStatus {
   authConfigured: boolean;
@@ -14,9 +17,18 @@ export interface TunnelStatus {
   isDevelopment: boolean;
   lastError?: string;
   managedPid?: number;
+  namedTunnelHostname?: string;
+  namedTunnelTokenConfigured: boolean;
   publicUrl?: string;
   startedAt?: string;
+  tunnelMode: TunnelMode;
   status: TunnelLifecycleState;
+}
+
+interface TunnelConfigurationInput {
+  namedTunnelHostname?: string;
+  namedTunnelToken?: string;
+  tunnelMode: TunnelMode;
 }
 
 export class TunnelManagerError extends Error {
@@ -52,14 +64,45 @@ export class TunnelManager {
       authConfigured,
       autoStart: remoteAccess.autoStart,
       binaryAvailable,
-      canStart: authConfigured && binaryAvailable,
+      canStart: authConfigured && binaryAvailable && this.hasTunnelConfiguration(remoteAccess),
       isDevelopment: environment.isDevelopment,
       lastError: remoteAccess.lastError ?? undefined,
       managedPid: remoteAccess.managedPid ?? undefined,
-      publicUrl: remoteAccess.tunnelUrl ?? undefined,
+      namedTunnelHostname: remoteAccess.namedTunnelHostname ?? undefined,
+      namedTunnelTokenConfigured: Boolean(remoteAccess.namedTunnelToken),
+      publicUrl: this.getPublicUrl(remoteAccess),
       startedAt: remoteAccess.startedAt ?? undefined,
+      tunnelMode: remoteAccess.tunnelMode,
       status: remoteAccess.tunnelStatus,
     };
+  }
+
+  async updateConfiguration(input: TunnelConfigurationInput) {
+    const current = await configStore.getRemoteAccess();
+    if (current.tunnelStatus !== 'inactive' && current.tunnelStatus !== 'error') {
+      throw new TunnelManagerError('Stop remote access before changing tunnel configuration.', 409);
+    }
+
+    const nextMode = input.tunnelMode;
+    const nextHostname =
+      nextMode === 'named-token'
+        ? normalizeHostname(input.namedTunnelHostname ?? current.namedTunnelHostname ?? '')
+        : null;
+    const nextToken =
+      nextMode === 'named-token'
+        ? normalizeSecretValue(input.namedTunnelToken, current.namedTunnelToken)
+        : null;
+
+    await configStore.setRemoteAccess({
+      enabled: false,
+      lastError: null,
+      namedTunnelHostname: nextHostname,
+      namedTunnelToken: nextToken,
+      tunnelMode: nextMode,
+      tunnelUrl: null,
+    });
+
+    return this.getStatus();
   }
 
   async start() {
@@ -73,28 +116,29 @@ export class TunnelManager {
     if (!(await this.isBinaryAvailable())) {
       throw new TunnelManagerError('cloudflared is not installed or not available on PATH.', 400);
     }
+    this.assertStartConfiguration(current);
 
     await this.cleanupStaleManagedProcess();
+    const nextRemoteAccess = await configStore.getRemoteAccess();
+    const command = this.buildTunnelCommand(nextRemoteAccess);
+
     await configStore.setRemoteAccess({
       enabled: true,
       lastError: null,
       managedPid: null,
       startedAt: null,
       tunnelStatus: 'starting',
-      tunnelUrl: null,
+      tunnelUrl: nextRemoteAccess.tunnelMode === 'quick' ? null : nextRemoteAccess.tunnelUrl,
     });
 
     return new Promise<TunnelStatus>((resolve, reject) => {
       let settled = false;
       this.stopRequested = false;
-      const child = spawn(
-        environment.tunnelBinary,
-        ['tunnel', '--no-autoupdate', '--url', environment.tunnelTargetUrl],
-        {
-          env: process.env,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }
-      );
+      const logLines: string[] = [];
+      const child = spawn(environment.tunnelBinary, command.args, {
+        env: command.env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 
       this.child = child;
       void configStore.setRemoteAccess({
@@ -102,28 +146,50 @@ export class TunnelManager {
         managedPid: child.pid ?? null,
       });
 
-      const handleChunk = (chunk: Buffer) => {
-        const text = chunk.toString();
-        const matchedUrl = text.match(TUNNEL_URL_PATTERN)?.[1];
-        if (!matchedUrl || settled) {
+      const markActive = async (publicUrl: string | null) => {
+        if (settled) {
           return;
         }
         settled = true;
-        void configStore.setRemoteAccess({
+        await configStore.setRemoteAccess({
           enabled: true,
           lastError: null,
           managedPid: child.pid ?? null,
           startedAt: new Date().toISOString(),
           tunnelStatus: 'active',
-          tunnelUrl: matchedUrl,
+          tunnelUrl: publicUrl,
         });
-        resolve(this.getStatus());
+        resolve(await this.getStatus());
+      };
+
+      const handleChunk = (chunk: Buffer) => {
+        for (const line of sanitizeTunnelLog(chunk.toString(), nextRemoteAccess.namedTunnelToken)) {
+          logLines.push(line);
+        }
+        if (logLines.length > MAX_TUNNEL_LOG_LINES) {
+          logLines.splice(0, logLines.length - MAX_TUNNEL_LOG_LINES);
+        }
+
+        if (nextRemoteAccess.tunnelMode === 'quick' && !settled) {
+          const matchedUrl = chunk.toString().match(TUNNEL_URL_PATTERN)?.[1];
+          if (matchedUrl) {
+            void markActive(matchedUrl);
+          }
+        }
       };
 
       child.stdout.on('data', handleChunk);
       child.stderr.on('data', handleChunk);
+      child.on('spawn', () => {
+        if (nextRemoteAccess.tunnelMode === 'named-token') {
+          setTimeout(() => {
+            void markActive(null);
+          }, NAMED_TUNNEL_STARTUP_GRACE_MS);
+        }
+      });
       child.on('error', (error) => {
-        const message = error.message || 'Failed to start cloudflared.';
+        const message =
+          selectTunnelErrorMessage(logLines) ?? error.message ?? 'Failed to start cloudflared.';
         this.child = null;
         void configStore.setRemoteAccess({
           enabled: false,
@@ -141,9 +207,8 @@ export class TunnelManager {
       child.on('exit', (code, signal) => {
         const message = this.stopRequested
           ? null
-          : `cloudflared exited before tunnel became active${code !== null ? ` (code ${code})` : ''}${
-              signal ? ` (${signal})` : ''
-            }.`;
+          : selectTunnelErrorMessage(logLines) ??
+            `cloudflared exited${code !== null ? ` (code ${code})` : ''}${signal ? ` (${signal})` : ''}.`;
         this.child = null;
         void configStore.setRemoteAccess({
           enabled: false,
@@ -215,6 +280,54 @@ export class TunnelManager {
     }
   }
 
+  private buildTunnelCommand(remoteAccess: StoredRemoteAccessConfig) {
+    if (remoteAccess.tunnelMode === 'named-token') {
+      return {
+        args: ['tunnel', '--no-autoupdate', 'run'],
+        env: {
+          ...process.env,
+          TUNNEL_TOKEN: remoteAccess.namedTunnelToken ?? '',
+        },
+      };
+    }
+
+    return {
+      args: ['tunnel', '--no-autoupdate', '--url', environment.tunnelTargetUrl],
+      env: process.env,
+    };
+  }
+
+  private getPublicUrl(remoteAccess: StoredRemoteAccessConfig) {
+    if (remoteAccess.tunnelMode === 'named-token') {
+      return remoteAccess.namedTunnelHostname
+        ? normalizePublicUrl(remoteAccess.namedTunnelHostname)
+        : undefined;
+    }
+
+    return remoteAccess.tunnelUrl ?? undefined;
+  }
+
+  private hasTunnelConfiguration(remoteAccess: StoredRemoteAccessConfig) {
+    if (remoteAccess.tunnelMode === 'named-token') {
+      return Boolean(remoteAccess.namedTunnelHostname && remoteAccess.namedTunnelToken);
+    }
+
+    return true;
+  }
+
+  private assertStartConfiguration(remoteAccess: StoredRemoteAccessConfig) {
+    if (remoteAccess.tunnelMode !== 'named-token') {
+      return;
+    }
+
+    if (!remoteAccess.namedTunnelHostname) {
+      throw new TunnelManagerError('Named tunnel hostname is required for named tunnel mode.', 409);
+    }
+    if (!remoteAccess.namedTunnelToken) {
+      throw new TunnelManagerError('Named tunnel token is required for named tunnel mode.', 409);
+    }
+  }
+
   private async cleanupStaleManagedProcess() {
     const remoteAccess = await configStore.getRemoteAccess();
     if (!remoteAccess.managedPid) {
@@ -283,4 +396,46 @@ export class TunnelManager {
       process.kill(pid, 'SIGKILL');
     }
   }
+}
+
+function sanitizeTunnelLog(output: string, token?: string | null) {
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => (token ? line.replaceAll(token, '[redacted]') : line));
+}
+
+function selectTunnelErrorMessage(logLines: string[]) {
+  const relevantLines = logLines.filter(
+    (line) =>
+      !/^\d{4}-\d{2}-\d{2}T/u.test(line) &&
+      !line.startsWith('INF ') &&
+      !line.startsWith('WRN ') &&
+      !line.startsWith("See 'cloudflared tunnel run --help'.")
+  );
+
+  return relevantLines.at(-1) ?? logLines.at(-1);
+}
+
+function normalizeHostname(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length ? trimTrailingSlash(normalizePublicUrl(trimmed)) : null;
+}
+
+function normalizePublicUrl(value: string) {
+  return value.includes('://') ? value : `https://${value}`;
+}
+
+function normalizeSecretValue(nextValue: string | undefined, currentValue: string | null) {
+  if (nextValue === undefined) {
+    return currentValue;
+  }
+
+  const trimmed = nextValue.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/+$/u, '');
 }

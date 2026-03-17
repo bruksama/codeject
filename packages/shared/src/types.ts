@@ -171,10 +171,17 @@ export type TerminalKey =
   | 'Escape'
   | 'Tab';
 
+export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
+
+export type TunnelMode = 'quick' | 'named-token';
+
 export interface RemoteAccessSettings {
   enabled: boolean;
-  tunnelStatus: 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
   authKey: string;
+  namedTunnelHostname?: string;
+  namedTunnelTokenConfigured?: boolean;
+  tunnelMode: TunnelMode;
+  tunnelStatus: TunnelLifecycleState;
   tunnelUrl?: string;
 }
 

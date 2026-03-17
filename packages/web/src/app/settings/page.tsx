@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Wifi,
@@ -39,10 +39,12 @@ import {
   type TunnelStatusResponse,
 } from '@/lib/api-client';
 import { useAppStore } from '@/stores/useAppStore';
+import type { TunnelMode } from '@/types';
 
 const APP_VERSION = '1.1.0';
 const GITHUB_REPOSITORY_URL = 'https://github.com/bruksama/codeject';
 const GITHUB_REPOSITORY_LABEL = 'github.com/bruksama/codeject';
+const TUNNEL_DRAFT_STORAGE_KEY = 'codeject-tunnel-draft';
 
 // Tunnel status badge
 function TunnelStatusBadge({ status }: { status: string }) {
@@ -217,6 +219,47 @@ function ConfirmModal({
 // Font size label
 const fontSizeLabels = { small: 'Small', medium: 'Medium', large: 'Large' };
 
+function readTunnelDraft() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(TUNNEL_DRAFT_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      namedTunnelHostname?: string;
+      tunnelMode?: TunnelMode;
+    };
+    if (parsed.tunnelMode !== 'quick' && parsed.tunnelMode !== 'named-token') {
+      return null;
+    }
+    return {
+      namedTunnelHostname: parsed.namedTunnelHostname ?? '',
+      tunnelMode: parsed.tunnelMode,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeTunnelDraft(tunnelMode: TunnelMode, namedTunnelHostname: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(
+    TUNNEL_DRAFT_STORAGE_KEY,
+    JSON.stringify({
+      namedTunnelHostname,
+      tunnelMode,
+    })
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const sessionApi = useSessionApi();
@@ -230,8 +273,14 @@ export default function SettingsPage() {
   const [storedAuthKeyInput, setStoredAuthKeyInput] = useState('');
   const [showStoredAuthKey, setShowStoredAuthKey] = useState(false);
   const [isTunnelAction, setIsTunnelAction] = useState<'start' | 'stop' | 'restart' | null>(null);
+  const [isSavingTunnelConfig, setIsSavingTunnelConfig] = useState(false);
   const [tunnelDetails, setTunnelDetails] = useState<TunnelStatusResponse | null>(null);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
+  const [tunnelModeInput, setTunnelModeInput] = useState<TunnelMode>('quick');
+  const [namedTunnelHostnameInput, setNamedTunnelHostnameInput] = useState('');
+  const [namedTunnelTokenInput, setNamedTunnelTokenInput] = useState('');
+  const [isTunnelDraftReady, setIsTunnelDraftReady] = useState(false);
+  const tunnelConfigDirtyRef = useRef(false);
 
   const { remoteAccess, fontSize, accentColor } = settings;
 
@@ -242,6 +291,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setStoredAuthKeyInput(getStoredApiKey());
+    const tunnelDraft = readTunnelDraft();
+    if (tunnelDraft) {
+      setTunnelModeInput(tunnelDraft.tunnelMode);
+      setNamedTunnelHostnameInput(tunnelDraft.namedTunnelHostname);
+      tunnelConfigDirtyRef.current = true;
+    }
+    setIsTunnelDraftReady(true);
     void loadTunnelStatus();
 
     const pollTimer = window.setInterval(() => {
@@ -276,8 +332,15 @@ export default function SettingsPage() {
       const tunnel = await apiClient.getTunnelStatus();
       setTunnelDetails(tunnel);
       setTunnelError(null);
+      if (!tunnelConfigDirtyRef.current) {
+        setTunnelModeInput(tunnel.tunnelMode);
+        setNamedTunnelHostnameInput(tunnel.namedTunnelHostname ?? '');
+      }
       useAppStore.getState().updateRemoteAccess({
         enabled: tunnel.authConfigured,
+        namedTunnelHostname: tunnel.namedTunnelHostname,
+        namedTunnelTokenConfigured: tunnel.namedTunnelTokenConfigured,
+        tunnelMode: tunnel.tunnelMode,
         tunnelStatus: tunnel.status,
         tunnelUrl: tunnel.publicUrl,
       });
@@ -315,6 +378,9 @@ export default function SettingsPage() {
       setTunnelError(null);
       useAppStore.getState().updateRemoteAccess({
         enabled: tunnel.authConfigured,
+        namedTunnelHostname: tunnel.namedTunnelHostname,
+        namedTunnelTokenConfigured: tunnel.namedTunnelTokenConfigured,
+        tunnelMode: tunnel.tunnelMode,
         tunnelStatus: tunnel.status,
         tunnelUrl: tunnel.publicUrl,
       });
@@ -331,6 +397,42 @@ export default function SettingsPage() {
       toast.error(message);
     } finally {
       setIsTunnelAction(null);
+    }
+  };
+
+  const handleSaveTunnelConfig = async () => {
+    setIsSavingTunnelConfig(true);
+    try {
+      const tunnel = await apiClient.saveTunnelConfiguration({
+        namedTunnelHostname: namedTunnelHostnameInput,
+        namedTunnelToken: tunnelModeInput === 'named-token' ? namedTunnelTokenInput : undefined,
+        tunnelMode: tunnelModeInput,
+      });
+      setTunnelDetails(tunnel);
+      setTunnelError(null);
+      tunnelConfigDirtyRef.current = false;
+      setTunnelModeInput(tunnel.tunnelMode);
+      setNamedTunnelHostnameInput(tunnel.namedTunnelHostname ?? '');
+      setNamedTunnelTokenInput('');
+      writeTunnelDraft(tunnel.tunnelMode, tunnel.namedTunnelHostname ?? '');
+      useAppStore.getState().updateRemoteAccess({
+        enabled: tunnel.authConfigured,
+        namedTunnelHostname: tunnel.namedTunnelHostname,
+        namedTunnelTokenConfigured: tunnel.namedTunnelTokenConfigured,
+        tunnelMode: tunnel.tunnelMode,
+        tunnelStatus: tunnel.status,
+        tunnelUrl: tunnel.publicUrl,
+      });
+      toast.success(
+        tunnelModeInput === 'quick' ? 'Quick tunnel mode saved' : 'Named tunnel configuration saved'
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to save tunnel configuration';
+      setTunnelError(message);
+      toast.error(message);
+    } finally {
+      setIsSavingTunnelConfig(false);
     }
   };
 
@@ -355,8 +457,23 @@ export default function SettingsPage() {
   const tunnelUrl = tunnelDetails?.publicUrl ?? remoteAccess.tunnelUrl;
   const tunnelStatus = tunnelDetails?.status ?? remoteAccess.tunnelStatus;
   const canStartTunnel = tunnelDetails?.canStart ?? remoteAccess.enabled;
+  const selectedTunnelMode = tunnelDetails?.tunnelMode ?? remoteAccess.tunnelMode;
+  const namedTunnelHostname =
+    tunnelDetails?.namedTunnelHostname ?? remoteAccess.namedTunnelHostname ?? '';
+  const namedTunnelTokenConfigured =
+    tunnelDetails?.namedTunnelTokenConfigured ?? remoteAccess.namedTunnelTokenConfigured;
   const tunnelBusy =
-    isTunnelAction !== null || tunnelStatus === 'starting' || tunnelStatus === 'stopping';
+    isTunnelAction !== null ||
+    isSavingTunnelConfig ||
+    tunnelStatus === 'starting' ||
+    tunnelStatus === 'stopping';
+
+  useEffect(() => {
+    if (!isTunnelDraftReady) {
+      return;
+    }
+    writeTunnelDraft(tunnelModeInput, namedTunnelHostnameInput);
+  }, [isTunnelDraftReady, namedTunnelHostnameInput, tunnelModeInput]);
 
   return (
     <div
@@ -423,6 +540,147 @@ export default function SettingsPage() {
           </div>
 
           <div className="px-4 py-3 border-b border-white/5 space-y-3">
+            <div
+              className="rounded-2xl px-3 py-3"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                    Tunnel Mode
+                  </p>
+                  <p className="mt-1 text-xs text-white/45">
+                    Quick stays zero-setup. Named uses your Cloudflare hostname and token.
+                  </p>
+                </div>
+                <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
+                  <button
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      tunnelModeInput === 'quick'
+                        ? 'bg-white text-[#08080f]'
+                        : 'text-white/60 hover:text-white/85'
+                    }`}
+                    onClick={() => {
+                      tunnelConfigDirtyRef.current = true;
+                      setTunnelModeInput('quick');
+                    }}
+                    type="button"
+                  >
+                    Quick
+                  </button>
+                  <button
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      tunnelModeInput === 'named-token'
+                        ? 'bg-white text-[#08080f]'
+                        : 'text-white/60 hover:text-white/85'
+                    }`}
+                    onClick={() => {
+                      tunnelConfigDirtyRef.current = true;
+                      setTunnelModeInput('named-token');
+                    }}
+                    type="button"
+                  >
+                    Named
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {tunnelModeInput === 'named-token' ? (
+              <div
+                className="rounded-2xl px-3 py-3"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                      Named Tunnel
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">
+                      Save the public hostname and tunnel token from your Cloudflare account.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/50">
+                    {namedTunnelTokenConfigured ? 'Token saved' : 'Token missing'}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <input
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/85 outline-none placeholder:text-white/25"
+                    onChange={(event) => {
+                      tunnelConfigDirtyRef.current = true;
+                      setNamedTunnelHostnameInput(event.target.value);
+                    }}
+                    placeholder="codeject.example.com"
+                    type="text"
+                    value={namedTunnelHostnameInput}
+                  />
+                  <input
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/85 outline-none placeholder:text-white/25"
+                    onChange={(event) => {
+                      tunnelConfigDirtyRef.current = true;
+                      setNamedTunnelTokenInput(event.target.value);
+                    }}
+                    placeholder={
+                      namedTunnelTokenConfigured
+                        ? 'Leave blank to keep saved token'
+                        : 'Paste tunnel token'
+                    }
+                    type="password"
+                    value={namedTunnelTokenInput}
+                  />
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-white/35">
+                    Current hostname: {namedTunnelHostname || 'Not configured'}
+                  </p>
+                  <button
+                    className="rounded-xl border border-white/10 bg-white/6 px-3 py-2 text-xs font-medium text-white/85 disabled:opacity-40"
+                    disabled={isSavingTunnelConfig}
+                    onClick={() => void handleSaveTunnelConfig()}
+                    type="button"
+                  >
+                    {isSavingTunnelConfig ? 'Saving…' : 'Save named tunnel'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="rounded-2xl px-3 py-3"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                      Quick Tunnel
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">
+                      Uses a temporary `trycloudflare.com` URL. Best for zero-setup remote access.
+                    </p>
+                  </div>
+                  <button
+                    className="rounded-xl border border-white/10 bg-white/6 px-3 py-2 text-xs font-medium text-white/85 disabled:opacity-40"
+                    disabled={isSavingTunnelConfig}
+                    onClick={() => void handleSaveTunnelConfig()}
+                    type="button"
+                  >
+                    {isSavingTunnelConfig ? 'Saving…' : 'Use quick tunnel'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={() => void handleTunnelAction('start')}
@@ -497,6 +755,11 @@ export default function SettingsPage() {
                 >
                   Show QR
                 </button>
+                <span className="text-[11px] text-white/35 self-center">
+                  {selectedTunnelMode === 'quick'
+                    ? 'Quick mode returns a temporary URL each start.'
+                    : 'Named mode keeps the hostname fixed and uses the saved token.'}
+                </span>
                 {tunnelDetails?.isDevelopment && (
                   <span className="text-[11px] text-white/35 self-center">
                     Dev mode stays manual. `Ctrl+C` stops the managed tunnel.

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -18,7 +19,7 @@ export async function readJsonFile<T>(filePath: string, fallback: T): Promise<T>
 
 export async function writeJsonFile(filePath: string, value: unknown) {
   await ensureDirectory(path.dirname(filePath));
-  const tempFilePath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tempFilePath = `${filePath}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
   await fs.writeFile(tempFilePath, JSON.stringify(value, null, 2), 'utf8');
   await fs.rename(tempFilePath, filePath);
 }
