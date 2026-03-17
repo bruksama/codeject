@@ -13,7 +13,10 @@ export default function StreamingIndicator({
   programName = 'Claude',
 }: StreamingIndicatorProps) {
   return (
-    <div className="flex items-start gap-3 fade-in" aria-label={`${programName} is responding`}>
+    <div
+      className="mb-4 flex items-start gap-3 fade-in"
+      aria-label={`${programName} is responding`}
+    >
       <div
         className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0"
         style={{
