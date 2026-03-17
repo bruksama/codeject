@@ -25,6 +25,8 @@ Before coding:
 
 For Codex sessions in this repository, use this flow and do not substitute a different primary skill when the task matches one of these categories.
 
+If you are Claude, look at [CLAUDE.md](./CLAUDE.md)
+
 1. First of all, use `$ck:ck-help` to find the most suitable skill and verify the workflow.
 2. Brainstorming must use `$ck:brainstorm`.
 3. Planning must use `$ck:plan`.

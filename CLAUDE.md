@@ -33,6 +33,8 @@ Before implementing:
 
 For Claude sessions in this repository, use this flow and do not substitute a different primary command when the task matches one of these categories.
 
+If you are Codex, look at [AGENTS.md](./AGENTS.md)
+
 1. First of all, use `/ck:ck-help` to find the most suitable skill and verify the workflow.
 2. Brainstorming must use `/ck:brainstorm`.
 3. Planning must use `/ck:plan`.
