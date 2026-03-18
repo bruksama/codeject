@@ -46,6 +46,12 @@ async function bootstrap() {
     terminalSessionManager,
   });
 
+  const sockets = new Set<net.Socket>();
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+
   app.set('trust proxy', true);
   app.use(
     cors({
@@ -80,9 +86,38 @@ async function bootstrap() {
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down`);
-    await tunnelManager.shutdown();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    process.exit(0);
+
+    const hardTimeout = setTimeout(() => {
+      logger.warn('Shutdown deadline exceeded, forcing close');
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+      process.exit(1);
+    }, 5_500);
+
+    try {
+      // Stop websocket clients/heartbeat first so they don't keep sockets alive.
+      await websocketHandler.shutdown();
+
+      // Best-effort: stop all persisted sessions (kills tmux sessions).
+      const sessions = await sessionStore.listSessions();
+      await terminalSessionManager.stopSessions(sessions);
+
+      // Best-effort: stop managed cloudflared.
+      await tunnelManager.shutdown();
+
+      // Stop accepting new connections; existing sockets may keep it open.
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+
+      // Ensure anything left is torn down.
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+
+      process.exit(0);
+    } finally {
+      clearTimeout(hardTimeout);
+    }
   };
 
   process.once('SIGINT', () => void shutdown('SIGINT'));

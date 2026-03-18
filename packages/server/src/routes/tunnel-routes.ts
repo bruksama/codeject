@@ -27,6 +27,12 @@ export function createTunnelRoutes(tunnelManager: TunnelManager) {
     );
   });
 
+  router.put('/auto-start', async (request, response) => {
+    await runTunnelAction(response, () =>
+      tunnelManager.setAutoStart(validateTunnelAutoStartInput(request.body))
+    );
+  });
+
   return router;
 }
 
@@ -60,6 +66,15 @@ function validateTunnelConfigInput(body: unknown) {
     namedTunnelToken,
     tunnelMode,
   };
+}
+
+function validateTunnelAutoStartInput(body: unknown) {
+  const input = typeof body === 'object' && body ? body : {};
+  const autoStart = Reflect.get(input, 'autoStart');
+  if (typeof autoStart !== 'boolean') {
+    throw new TunnelManagerError('autoStart must be a boolean.', 400);
+  }
+  return autoStart;
 }
 
 function readTunnelMode(input: object) {

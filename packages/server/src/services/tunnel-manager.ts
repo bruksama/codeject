@@ -46,11 +46,10 @@ export class TunnelManager {
 
   async initialize() {
     await this.cleanupStaleManagedProcess();
-    if (!environment.tunnelAutoStart || environment.isDevelopment) {
-      return;
-    }
     const remoteAccess = await configStore.getRemoteAccess();
-    if (remoteAccess.autoStart) {
+    // Auto-start is intentionally scoped to named tunnels only.
+    // Quick tunnels are ephemeral and should remain manual.
+    if (remoteAccess.autoStart && remoteAccess.tunnelMode === 'named-token') {
       await this.start();
     }
   }
@@ -75,6 +74,15 @@ export class TunnelManager {
       tunnelMode: remoteAccess.tunnelMode,
       status: remoteAccess.tunnelStatus,
     };
+  }
+
+  async setAutoStart(autoStart: boolean) {
+    const current = await configStore.getRemoteAccess();
+    if (autoStart && current.tunnelMode !== 'named-token') {
+      throw new TunnelManagerError('Auto-start is only available for named tunnel mode.', 409);
+    }
+    await configStore.setRemoteAccess({ autoStart });
+    return this.getStatus();
   }
 
   async updateConfiguration(input: TunnelConfigurationInput) {

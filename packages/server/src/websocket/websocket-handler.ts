@@ -133,6 +133,14 @@ export function createWebSocketHandler({
         websocketServer.emit('connection', websocket, request, sessionId);
       });
     },
+    async shutdown() {
+      websocketServer.close();
+      for (const client of clients.values()) {
+        client.socket.terminate();
+        clients.delete(client.socket);
+        terminalSessionManager.unobserve(client.sessionId);
+      }
+    },
   };
 
   function broadcast(sessionId: string, frame: ServerWebSocketMessage) {
