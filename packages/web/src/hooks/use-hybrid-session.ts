@@ -1,31 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   type ChatState,
   type ChatStatePhase,
   type ConnectionStatus,
   type Message,
-  type SurfaceMode,
   type SurfaceRequirement,
-  type TerminalKey,
-  type TerminalRuntime,
 } from '@/types';
 import { getWebSocketUrl } from '@/lib/api-client';
 import { WebSocketClient } from '@/lib/websocket-client';
 import { useAppStore } from '@/stores/useAppStore';
+import {
+  mergeOptimisticMessages,
+  normalizeChatState,
+  normalizeMessage,
+  normalizeTerminalRuntime,
+  reconcileSubmittingActionId,
+} from './use-hybrid-session-helpers';
 
 const EMPTY_MESSAGES: Message[] = [];
 
-interface HybridSize {
-  cols: number;
-  rows: number;
-}
-
 interface HybridState {
-  canWrite: boolean;
   chatState?: ChatState;
-  controllerClientId?: string;
   lastError: string | null;
   optimisticPrompt?: {
     acknowledgedAssistant: boolean;
@@ -34,27 +31,19 @@ interface HybridState {
     prompt: string;
     userMessage: Message;
   };
-  resetToken: number;
-  sessionId?: string;
+  submittingActionId: string | null;
   status: ConnectionStatus;
-  surfaceMode: SurfaceMode;
   surfaceRequirement: SurfaceRequirement;
-  terminalRole: 'controller' | 'viewer';
 }
 
-export function useHybridSession(sessionId: string | undefined, size: HybridSize) {
+export function useHybridSession(sessionId: string | undefined) {
   const [state, setState] = useState<HybridState>({
-    canWrite: true,
     lastError: null,
-    resetToken: 0,
+    submittingActionId: null,
     status: 'idle',
-    surfaceMode: 'chat',
     surfaceRequirement: 'terminal-available',
-    terminalRole: 'controller',
   });
   const clientRef = useRef<WebSocketClient | null>(null);
-  const sizeRef = useRef(size);
-  const terminalListenersRef = useRef(new Set<(chunk: string) => void>());
   const updateSession = useAppStore((store) => store.updateSession);
   const addMessage = useAppStore((store) => store.addMessage);
   const updateMessage = useAppStore((store) => store.updateMessage);
@@ -65,31 +54,47 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
 
   const handleStatus = useEffectEvent((status: ConnectionStatus) => {
     if (!sessionId) return;
-    setState((current) => ({ ...current, sessionId, status }));
+    setState((current) => ({
+      ...current,
+      status,
+      submittingActionId: status === 'connected' ? current.submittingActionId : null,
+    }));
     updateSession(sessionId, { status });
   });
 
   useEffect(() => {
     if (!sessionId) return;
 
-    const listeners = terminalListenersRef.current;
     const client = new WebSocketClient(getWebSocketUrl(sessionId), {
       onError: (message) => {
-        setState((current) => ({ ...current, lastError: message, sessionId, status: 'error' }));
+        setState((current) => ({
+          ...current,
+          lastError: message,
+          status: 'error',
+          submittingActionId: null,
+        }));
         updateSession(sessionId, { status: 'error' });
       },
       onMessage: (message) => {
         switch (message.type) {
-          case 'chat:bootstrap':
+          case 'chat:bootstrap': {
+            const nextChatState = normalizeChatState(message.chatState);
             setState((current) => ({
               ...current,
-              chatState: normalizeChatState(message.chatState),
+              chatState: nextChatState,
+              submittingActionId: reconcileSubmittingActionId(
+                current.submittingActionId,
+                nextChatState,
+                current.surfaceRequirement,
+                current.status
+              ),
             }));
             updateSession(sessionId, {
-              chatState: normalizeChatState(message.chatState),
+              chatState: nextChatState,
               messages: message.messages.map(normalizeMessage),
             });
             return;
+          }
           case 'chat:message':
             setState((current) => {
               const optimisticPrompt = current.optimisticPrompt;
@@ -124,74 +129,57 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
             return;
           case 'chat:update':
             setState((current) => {
-              if (!current.optimisticPrompt) {
+              if (!current.optimisticPrompt || !message.content.trim()) {
                 return current;
               }
 
-              return message.content.trim() ? { ...current, optimisticPrompt: undefined } : current;
+              return { ...current, optimisticPrompt: undefined };
             });
             updateMessage(sessionId, message.messageId, {
               content: message.content,
               isStreaming: message.isStreaming,
             });
             return;
-          case 'surface:update':
+          case 'surface:update': {
+            const nextChatState = normalizeChatState(message.chatState);
             setState((current) => ({
               ...current,
-              chatState: normalizeChatState(message.chatState),
-              surfaceMode: message.mode,
+              chatState: nextChatState,
+              submittingActionId: reconcileSubmittingActionId(
+                current.submittingActionId,
+                nextChatState,
+                message.requirement,
+                current.status
+              ),
               surfaceRequirement: message.requirement,
             }));
             updateSession(sessionId, {
-              chatState: normalizeChatState(message.chatState),
-              surfaceMode: message.mode,
+              chatState: nextChatState,
               surfaceRequirement: message.requirement,
             });
             return;
-          case 'terminal:ready':
+          }
+          case 'terminal:ready': {
+            const nextChatState = normalizeChatState(message.chatState);
             handleStatus(message.status);
             setState((current) => ({
               ...current,
-              chatState: normalizeChatState(message.chatState),
-              sessionId,
-              surfaceMode: message.surfaceMode,
+              chatState: nextChatState,
+              submittingActionId: reconcileSubmittingActionId(
+                current.submittingActionId,
+                nextChatState,
+                message.surfaceRequirement,
+                message.status
+              ),
               surfaceRequirement: message.surfaceRequirement,
             }));
             updateSession(sessionId, {
-              chatState: normalizeChatState(message.chatState),
-              surfaceMode: message.surfaceMode,
+              chatState: nextChatState,
               surfaceRequirement: message.surfaceRequirement,
               terminal: normalizeTerminalRuntime(message.terminal),
             });
-            client.send({
-              cols: sizeRef.current.cols,
-              rows: sizeRef.current.rows,
-              type: 'terminal:init',
-              wantsControl: true,
-            });
             return;
-          case 'terminal:output':
-            setState((current) => ({ ...current, lastError: null, sessionId }));
-            for (const listener of listeners) {
-              listener(message.data);
-            }
-            return;
-          case 'terminal:reset':
-            setState((current) => ({
-              ...current,
-              lastError: null,
-              resetToken: current.resetToken + 1,
-              sessionId,
-            }));
-            return;
-          case 'terminal:control-state':
-            setState((current) => ({
-              ...current,
-              canWrite: message.canWrite,
-              controllerClientId: message.controllerClientId,
-              terminalRole: message.mode,
-            }));
-            return;
+          }
           default:
             return;
         }
@@ -205,182 +193,109 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
     return () => {
       client.disconnect();
       clientRef.current = null;
-      listeners.clear();
     };
   }, [addMessage, sessionId, updateMessage, updateSession]);
 
-  useEffect(() => {
-    sizeRef.current = size;
-  }, [size]);
-
-  useEffect(() => {
-    if (!clientRef.current || !sessionId || state.status !== 'connected') return;
-    clientRef.current.send({ cols: size.cols, rows: size.rows, type: 'terminal:resize' });
-  }, [sessionId, size.cols, size.rows, state.status]);
-
-  const onTerminalData = useCallback((listener: (chunk: string) => void) => {
-    terminalListenersRef.current.add(listener);
-    return () => {
-      terminalListenersRef.current.delete(listener);
-    };
-  }, []);
-
-  const requestTerminalControl = useCallback(() => {
-    clientRef.current?.send({ type: 'terminal:claim-control' });
-  }, []);
-
-  return useMemo(
-    () => ({
-      canWrite: state.canWrite,
-      chatState: state.chatState,
-      controllerClientId: state.controllerClientId,
-      disconnect() {
-        clientRef.current?.disconnect();
-      },
-      lastError: state.lastError,
-      messages: mergeOptimisticMessages(sessionMessages, state.optimisticPrompt),
-      onTerminalData,
-      openSurface(mode: SurfaceMode) {
-        if (!sessionId) return;
-        setState((current) => ({ ...current, surfaceMode: mode }));
-        updateSession(sessionId, { surfaceMode: mode });
-        clientRef.current?.send({ mode, type: 'surface:set-mode' });
-      },
-      interruptPrompt() {
-        if (!sessionId) return;
-        const timestamp = new Date();
-        const nextPhase: ChatStatePhase =
-          state.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
-        const nextChatState = state.chatState
-          ? {
-              ...state.chatState,
-              actionRequest: undefined,
-              lastAssistantMessageId: undefined,
-              phase: nextPhase,
-              terminalRequiredReason: undefined,
-              transcriptUpdatedAt: timestamp,
-            }
-          : undefined;
-
-        setState((current) => ({
-          ...current,
-          chatState: nextChatState,
-          optimisticPrompt: undefined,
-        }));
-        updateSession(sessionId, { chatState: nextChatState });
-        clientRef.current?.send({ key: 'Escape', type: 'terminal:key' });
-        window.setTimeout(() => {
-          clientRef.current?.send({ key: 'Escape', type: 'terminal:key' });
-        }, 90);
-      },
-      reconnect() {
-        setState((current) => ({ ...current, lastError: null }));
-        clientRef.current?.reconnect();
-      },
-      requestTerminalControl,
-      resetToken: state.resetToken,
-      sendPrompt(content: string) {
-        const trimmed = content.trim();
-        if (!trimmed) return false;
-        const timestamp = new Date();
-        const promptKey = `${timestamp.getTime()}`;
-        setState((current) => ({
-          ...current,
-          chatState: {
-            ...current.chatState,
+  return {
+    chatState: state.chatState,
+    disconnect() {
+      clientRef.current?.disconnect();
+    },
+    interruptPrompt() {
+      if (!sessionId) return;
+      const timestamp = new Date();
+      const nextPhase: ChatStatePhase =
+        state.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
+      const nextChatState = state.chatState
+        ? {
+            ...state.chatState,
             actionRequest: undefined,
             lastAssistantMessageId: undefined,
-            lastPrompt: trimmed,
-            phase: 'awaiting-assistant',
+            phase: nextPhase,
             terminalRequiredReason: undefined,
             transcriptUpdatedAt: timestamp,
+          }
+        : undefined;
+
+      setState((current) => ({
+        ...current,
+        chatState: nextChatState,
+        optimisticPrompt: undefined,
+      }));
+      updateSession(sessionId, { chatState: nextChatState });
+      clientRef.current?.send({ key: 'Escape', type: 'terminal:key' });
+      window.setTimeout(() => {
+        clientRef.current?.send({ key: 'Escape', type: 'terminal:key' });
+      }, 90);
+    },
+    lastError: state.lastError,
+    messages: mergeOptimisticMessages(sessionMessages, state.optimisticPrompt),
+    reconnect() {
+      setState((current) => ({
+        ...current,
+        lastError: null,
+        submittingActionId: null,
+      }));
+      clientRef.current?.reconnect();
+    },
+    sendPrompt(content: string) {
+      const trimmed = content.trim();
+      if (!trimmed) return false;
+
+      const timestamp = new Date();
+      const promptKey = `${timestamp.getTime()}`;
+      setState((current) => ({
+        ...current,
+        chatState: {
+          ...current.chatState,
+          actionRequest: undefined,
+          lastAssistantMessageId: undefined,
+          lastPrompt: trimmed,
+          phase: 'awaiting-assistant',
+          terminalRequiredReason: undefined,
+          transcriptUpdatedAt: timestamp,
+        },
+        optimisticPrompt: {
+          acknowledgedAssistant: false,
+          acknowledgedUser: false,
+          assistantMessage: {
+            content: '',
+            id: `optimistic-assistant-${promptKey}`,
+            isStreaming: true,
+            role: 'assistant',
+            timestamp,
           },
-          optimisticPrompt: {
-            acknowledgedAssistant: false,
-            acknowledgedUser: false,
-            assistantMessage: {
-              content: '',
-              id: `optimistic-assistant-${promptKey}`,
-              isStreaming: true,
-              role: 'assistant',
-              timestamp,
-            },
-            prompt: trimmed,
-            userMessage: {
-              content: trimmed,
-              id: `optimistic-user-${promptKey}`,
-              role: 'user',
-              timestamp,
-            },
+          prompt: trimmed,
+          userMessage: {
+            content: trimmed,
+            id: `optimistic-user-${promptKey}`,
+            role: 'user',
+            timestamp,
           },
-          surfaceMode: 'chat',
-          surfaceRequirement: 'terminal-available',
-        }));
-        clientRef.current?.send({ content: trimmed, type: 'chat:prompt' });
-        return true;
-      },
-      sendTerminalInput(data: string) {
-        if (!data.length || !state.canWrite || state.status !== 'connected') return false;
-        clientRef.current?.send({ data, type: 'terminal:input' });
-        return true;
-      },
-      sendTerminalKey(key: TerminalKey) {
-        if (!state.canWrite || state.status !== 'connected') return;
-        clientRef.current?.send({ key, type: 'terminal:key' });
-      },
-      status: state.status,
-      submitActionInput(data: string) {
-        if (!data.length || !state.canWrite || state.status !== 'connected') return false;
-        clientRef.current?.send({ data, type: 'terminal:input' });
-        clientRef.current?.send({ key: 'Enter', type: 'terminal:key' });
-        return true;
-      },
-      surfaceMode: state.surfaceMode,
-      surfaceRequirement: state.surfaceRequirement,
-      terminalRole: state.terminalRole,
-    }),
-    [onTerminalData, requestTerminalControl, sessionId, sessionMessages, state, updateSession]
-  );
-}
-
-function mergeOptimisticMessages(
-  sessionMessages: Message[],
-  optimisticPrompt: HybridState['optimisticPrompt']
-) {
-  if (!optimisticPrompt) {
-    return sessionMessages;
-  }
-
-  const merged = [...sessionMessages];
-  if (!optimisticPrompt.acknowledgedUser) {
-    merged.push(optimisticPrompt.userMessage);
-  }
-  if (!optimisticPrompt.acknowledgedAssistant) {
-    merged.push(optimisticPrompt.assistantMessage);
-  }
-  return merged;
-}
-
-function normalizeMessage(message: Message) {
-  return { ...message, timestamp: new Date(message.timestamp) };
-}
-
-function normalizeChatState(chatState: ChatState | undefined) {
-  return chatState
-    ? {
-        ...chatState,
-        transcriptUpdatedAt: chatState.transcriptUpdatedAt
-          ? new Date(chatState.transcriptUpdatedAt)
-          : undefined,
+        },
+        surfaceRequirement: 'terminal-available',
+      }));
+      clientRef.current?.send({ content: trimmed, type: 'chat:prompt' });
+      return true;
+    },
+    status: state.status,
+    submitActionInput(actionId: string, data: string) {
+      if (state.status !== 'connected') return false;
+      if (!state.chatState?.actionRequest || state.chatState.actionRequest.id !== actionId) {
+        return false;
       }
-    : undefined;
-}
-
-function normalizeTerminalRuntime(terminal: TerminalRuntime | undefined) {
-  return terminal
-    ? {
-        ...terminal,
-        lastSnapshotAt: terminal.lastSnapshotAt ? new Date(terminal.lastSnapshotAt) : undefined,
+      if (data.length > 0) {
+        clientRef.current?.send({ data, type: 'terminal:input' });
       }
-    : undefined;
+      clientRef.current?.send({ key: 'Enter', type: 'terminal:key' });
+      setState((current) => ({
+        ...current,
+        lastError: null,
+        submittingActionId: actionId,
+      }));
+      return true;
+    },
+    submittingActionId: state.submittingActionId,
+    surfaceRequirement: state.surfaceRequirement,
+  };
 }

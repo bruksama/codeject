@@ -5,31 +5,21 @@ import {
   type ChatState,
   type Message,
   type Session,
-  type SurfaceMode,
   type SurfaceRequirement,
   type TerminalSnapshot,
 } from '@codeject/shared';
 import { ProviderTranscriptReader } from './provider-transcript-reader.js';
 import { type SessionStore } from './session-store.js';
 import { extractChatResponseFromTerminal, sanitizeOutput } from '../utils/output-sanitizer.js';
-import { extractActionRequest } from '../utils/action-request-extractor.js';
+import { analyzeTerminalInteraction } from '../utils/action-request-extractor.js';
 
 interface SupervisorEvents {
   'chat:message': [sessionId: string, message: Message];
   'chat:update': [sessionId: string, messageId: string, content: string, isStreaming: boolean];
-  'surface:update': [
-    sessionId: string,
-    payload: { chatState?: ChatState; mode: SurfaceMode; reason?: string; requirement: SurfaceRequirement },
-  ];
+  'surface:update': [sessionId: string, payload: { chatState?: ChatState; reason?: string; requirement: SurfaceRequirement }];
 }
 
 const ASSISTANT_IDLE_MS = 1200;
-const TERMINAL_REQUIRED_PATTERNS = [
-  /(press|hit)\s+(enter|return)\s+to\s+(continue|approve|confirm)/i,
-  /\b(approve|approval required|confirm action|confirm execution|allow tool)\b/i,
-  /\b(use (the )?arrow keys|select an option|choose an option|pick an option)\b/i,
-  /\b(y\/n|yes\/no)\b/i,
-];
 
 export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   private readonly assistantTimers = new Map<string, NodeJS.Timeout>();
@@ -47,7 +37,6 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     return {
       chatState: syncedSession.chatState,
       messages: syncedSession.messages,
-      surfaceMode: syncedSession.surfaceMode,
       surfaceRequirement: syncedSession.surfaceRequirement,
     };
   }
@@ -81,31 +70,15 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
       chatState,
       lastMessageAt: timestamp,
       messages: [...session.messages, userMessage, assistantMessage],
-      surfaceMode: 'chat',
       surfaceRequirement: 'terminal-available',
     });
     this.emit('chat:message', sessionId, userMessage);
     this.emit('chat:message', sessionId, assistantMessage);
     this.emit('surface:update', sessionId, {
       chatState,
-      mode: 'chat',
       requirement: 'terminal-available',
     });
     return userMessage;
-  }
-
-  async handleSurfaceModeChange(sessionId: string, mode: SurfaceMode) {
-    const session = await this.sessionStore.getSession(sessionId);
-    if (!session) return null;
-    const nextSession = await this.sessionStore.updateSession(sessionId, { surfaceMode: mode });
-    if (!nextSession) return null;
-    this.emit('surface:update', sessionId, {
-      chatState: nextSession.chatState,
-      mode,
-      reason: nextSession.chatState?.terminalRequiredReason,
-      requirement: nextSession.surfaceRequirement,
-    });
-    return nextSession;
   }
 
   async handleStatus(sessionId: string, status: Session['status']) {
@@ -113,26 +86,48 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     await this.finalizeAssistantMessage(sessionId);
   }
 
+  async handleActionSubmission(sessionId: string) {
+    const session = await this.sessionStore.getSession(sessionId);
+    if (!session?.chatState?.actionRequest) return;
+
+    const timestamp = new Date();
+    const chatState: ChatState = {
+      ...session.chatState,
+      actionRequest: undefined,
+      phase: 'idle',
+      terminalRequiredReason: undefined,
+      transcriptUpdatedAt: timestamp,
+    };
+    await this.sessionStore.updateSession(sessionId, {
+      chatState,
+      surfaceRequirement: 'terminal-available',
+    });
+    this.emit('surface:update', sessionId, {
+      chatState,
+      requirement: 'terminal-available',
+    });
+  }
+
   async handleTerminalSnapshot(sessionId: string, snapshot: TerminalSnapshot) {
     const session = await this.sessionStore.getSession(sessionId);
     if (!session) return;
-    const detection = detectTerminalRequirement(snapshot.content);
-    const nextRequirement: SurfaceRequirement = detection ? 'terminal-required' : 'terminal-available';
-    const transcriptResult = detection ? null : await this.transcriptReader.readAssistantMessage(session);
+    const transcriptResult = await this.transcriptReader.readAssistantMessage(session).catch(() => null);
+    const transcriptActionContent = transcriptResult?.content?.trim() ? transcriptResult.content : null;
     const transcriptContent = shouldAcceptTranscriptResult(session, transcriptResult)
       ? transcriptResult?.content ?? null
       : null;
+    const interaction = analyzeTerminalInteraction({
+      snapshotText: snapshot.content,
+      transcriptText: transcriptActionContent,
+    });
+    const nextRequirement: SurfaceRequirement = interaction.requirement;
     const nextChatState = deriveChatState(session, {
-      actionRequest: deriveActionRequest({
-        detectionReason: detection?.reason,
-        snapshot: snapshot.content,
-        transcriptContent,
-      }),
-      reason: detection?.reason,
+      actionRequest: interaction.actionRequest,
+      reason: interaction.reason,
     });
     const terminalAssistantContent = deriveTerminalAssistantFallback(session, snapshot.content);
     const assistantContent =
-      transcriptContent || (detection ? '' : terminalAssistantContent);
+      transcriptContent || (interaction.requirement === 'terminal-required' ? '' : terminalAssistantContent);
 
     if (
       nextRequirement !== session.surfaceRequirement ||
@@ -146,8 +141,7 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
       });
       this.emit('surface:update', sessionId, {
         chatState: nextChatState,
-        mode: session.surfaceMode,
-        reason: detection?.reason,
+        reason: interaction.reason,
         requirement: nextRequirement,
       });
     }
@@ -191,7 +185,6 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
       this.emit('chat:message', session.id, message);
       this.emit('surface:update', session.id, {
         chatState,
-        mode: session.surfaceMode,
         reason: chatState.terminalRequiredReason,
         requirement: session.surfaceRequirement,
       });
@@ -214,7 +207,6 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     this.emit('chat:update', session.id, currentMessage.id, content, true);
     this.emit('surface:update', session.id, {
       chatState,
-      mode: session.surfaceMode,
       reason: chatState.terminalRequiredReason,
       requirement: session.surfaceRequirement,
     });
@@ -331,7 +323,6 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     this.emit('chat:update', sessionId, messageId, message.content, false);
     this.emit('surface:update', sessionId, {
       chatState,
-      mode: session.surfaceMode,
       reason: chatState.terminalRequiredReason,
       requirement: session.surfaceRequirement,
     });
@@ -424,21 +415,6 @@ function deriveChatState(
     terminalRequiredReason: undefined,
     transcriptUpdatedAt: new Date(),
   };
-}
-
-function deriveActionRequest({
-  detectionReason,
-  snapshot,
-  transcriptContent,
-}: {
-  detectionReason?: string;
-  snapshot: string;
-  transcriptContent: string | null;
-}) {
-  const transcriptRequest = transcriptContent ? extractActionRequest(transcriptContent, 'transcript') : undefined;
-  if (transcriptRequest) return transcriptRequest;
-  if (!detectionReason) return undefined;
-  return extractActionRequest(snapshot, 'terminal');
 }
 
 function deriveAssistantContent(content: string, lastPrompt: string | undefined) {
@@ -571,15 +547,4 @@ function findLastPromptLine(lines: string[], prompt: string) {
     }
   }
   return -1;
-}
-
-function detectTerminalRequirement(content: string) {
-  const recentText = content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(-20)
-    .join('\n');
-  const pattern = TERMINAL_REQUIRED_PATTERNS.find((entry) => entry.test(recentText));
-  return pattern ? { reason: recentText.split('\n').slice(-3).join(' ') } : null;
 }

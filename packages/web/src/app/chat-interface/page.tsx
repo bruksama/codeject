@@ -1,16 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatTranscript } from '@/components/chat/chat-transcript';
-import { HybridSurfaceToggle } from '@/components/chat/hybrid-surface-toggle';
 import { TerminalRequiredBanner } from '@/components/chat/terminal-required-banner';
-import { TerminalInputBar } from '@/components/terminal/terminal-input-bar';
-import { TerminalKeyStrip } from '@/components/terminal/terminal-key-strip';
-import { TerminalViewport } from '@/components/terminal/terminal-viewport';
 import ConnectionBadge from '@/components/ui/ConnectionBadge';
 import ProgramIcon from '@/components/ui/program-icon';
 import { useHybridSession } from '@/hooks/use-hybrid-session';
@@ -23,10 +19,7 @@ export default function ChatInterfacePage() {
   const { sessions, activeSessionId } = useAppStore();
   const session = sessions.find((item) => item.id === activeSessionId) ?? sessions[0];
   const [chatDraft, setChatDraft] = useState('');
-  const [pendingActionId, setPendingActionId] = useState<string | null>(null);
-  const [terminalDraft, setTerminalDraft] = useState('');
-  const [terminalSize, setTerminalSize] = useState({ cols: 120, rows: 32 });
-  const hybrid = useHybridSession(session?.id, terminalSize);
+  const hybrid = useHybridSession(session?.id);
 
   useEffect(() => {
     if (session?.id) {
@@ -35,49 +28,6 @@ export default function ChatInterfacePage() {
     }
     void sessionApi.loadSessions().catch(() => undefined);
   }, [session?.id, sessionApi]);
-
-  const handleViewportSize = useCallback((size: { cols: number; rows: number }) => {
-    setTerminalSize((current) =>
-      current.cols === size.cols && current.rows === size.rows ? current : size
-    );
-  }, []);
-
-  const handleChatSubmit = useCallback(() => {
-    if (!hybrid.sendPrompt(chatDraft)) {
-      toast.error('Unable to send chat prompt');
-      return;
-    }
-    setChatDraft('');
-  }, [chatDraft, hybrid]);
-
-  const handleInterrupt = useCallback(() => {
-    hybrid.interruptPrompt();
-  }, [hybrid]);
-
-  const handleTerminalSubmit = useCallback(
-    (value: string) => {
-      if (!hybrid.sendTerminalInput(value)) {
-        toast.error('Terminal input is unavailable');
-        return;
-      }
-      hybrid.sendTerminalKey('Enter');
-      setTerminalDraft('');
-    },
-    [hybrid]
-  );
-
-  const handleActionSubmit = useCallback(
-    (submit: string) => {
-      const actionRequest = hybrid.chatState?.actionRequest;
-      if (!actionRequest) return;
-      if (!hybrid.submitActionInput(submit)) {
-        toast.error('Terminal input is unavailable');
-        return;
-      }
-      setPendingActionId(actionRequest.id);
-    },
-    [hybrid]
-  );
 
   if (!session) {
     return (
@@ -95,13 +45,22 @@ export default function ChatInterfacePage() {
   }
 
   const showTerminalRequired = hybrid.surfaceRequirement === 'terminal-required';
-  const showTerminal = hybrid.surfaceMode === 'terminal';
-  const isTerminalInputDisabled = !hybrid.canWrite || hybrid.status !== 'connected';
   const isSubmittingAction =
-    Boolean(pendingActionId) && pendingActionId === hybrid.chatState?.actionRequest?.id;
+    Boolean(hybrid.submittingActionId) &&
+    hybrid.submittingActionId === hybrid.chatState?.actionRequest?.id;
   const isHandlingPrompt =
     hybrid.chatState?.phase === 'awaiting-assistant' ||
     hybrid.chatState?.phase === 'streaming-assistant';
+
+  const handleActionSubmit = async (submit: string) => {
+    const actionRequest = hybrid.chatState?.actionRequest;
+    if (!actionRequest) return false;
+    const didSubmit = hybrid.submitActionInput(actionRequest.id, submit);
+    if (!didSubmit) {
+      toast.error('CLI input is unavailable');
+    }
+    return didSubmit;
+  };
 
   return (
     <div
@@ -142,86 +101,46 @@ export default function ChatInterfacePage() {
         </button>
       </header>
 
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <HybridSurfaceToggle activeMode={hybrid.surfaceMode} onModeChange={hybrid.openSurface} />
-        <div className="max-w-[42vw] truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[10px] text-white/40">
+      <div className="mb-2 flex justify-end">
+        <div className="max-w-[52vw] truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[10px] text-white/40">
           {session.terminal?.sessionName ? session.terminal.sessionName : 'tmux starting'}
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2.5">
         {showTerminalRequired ? (
-          <TerminalRequiredBanner
-            onOpenTerminal={() => hybrid.openSurface('terminal')}
-            reason={hybrid.chatState?.terminalRequiredReason}
-          />
+          <TerminalRequiredBanner reason={hybrid.chatState?.terminalRequiredReason} />
         ) : null}
 
-        {showTerminal ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/60">
-              <span>
-                {hybrid.terminalRole === 'controller'
-                  ? 'Controlling terminal'
-                  : 'Read only terminal'}
-              </span>
-              {hybrid.canWrite ? null : (
-                <button
-                  className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/80"
-                  onClick={hybrid.requestTerminalControl}
-                  type="button"
-                >
-                  Take control
-                </button>
-              )}
-            </div>
-            <div className="min-h-0 flex-1">
-              <TerminalViewport
-                onSizeChange={handleViewportSize}
-                onTerminalData={hybrid.onTerminalData}
-                resetToken={hybrid.resetToken}
-                status={hybrid.status}
-              />
-            </div>
-            <TerminalKeyStrip
-              disabled={isTerminalInputDisabled}
-              onKeyPress={hybrid.sendTerminalKey}
-            />
-            <TerminalInputBar
-              disabled={isTerminalInputDisabled}
-              onBackspace={() => hybrid.sendTerminalKey('Backspace')}
-              onEnter={() => hybrid.sendTerminalKey('Enter')}
-              onSubmit={handleTerminalSubmit}
-              onValueChange={setTerminalDraft}
-              value={terminalDraft}
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] px-3 pb-2 pt-3">
+          <div className="h-full min-h-0">
+            <ChatTranscript
+              chatState={hybrid.chatState}
+              isSubmittingAction={isSubmittingAction}
+              messages={hybrid.messages}
+              onSubmitAction={handleActionSubmit}
+              programIcon={session.cliProgram.icon}
+              programName={session.cliProgram.name}
+              sessionId={session.id}
             />
           </div>
-        ) : (
-          <div className="relative min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] px-3 pb-2 pt-3">
-            <div className="min-h-0 h-full">
-              <ChatTranscript
-                chatState={hybrid.chatState}
-                isSubmittingAction={isSubmittingAction}
-                messages={hybrid.messages}
-                onOpenTerminal={() => hybrid.openSurface('terminal')}
-                onSubmitAction={handleActionSubmit}
-                programIcon={session.cliProgram.icon}
-                programName={session.cliProgram.name}
-                sessionId={session.id}
-              />
-            </div>
-            <ChatComposer
-              className="absolute inset-x-3 bottom-3 z-20"
-              disabled={hybrid.status === 'error'}
-              errorMessage={hybrid.lastError}
-              isBusy={isHandlingPrompt}
-              onInterrupt={handleInterrupt}
-              onSubmit={handleChatSubmit}
-              onValueChange={setChatDraft}
-              value={chatDraft}
-            />
-          </div>
-        )}
+          <ChatComposer
+            className="absolute inset-x-3 bottom-3 z-20"
+            disabled={hybrid.status === 'error'}
+            errorMessage={hybrid.lastError}
+            isBusy={isHandlingPrompt}
+            onInterrupt={() => hybrid.interruptPrompt()}
+            onSubmit={() => {
+              if (!hybrid.sendPrompt(chatDraft)) {
+                toast.error('Unable to send chat prompt');
+                return;
+              }
+              setChatDraft('');
+            }}
+            onValueChange={setChatDraft}
+            value={chatDraft}
+          />
+        </div>
       </div>
     </div>
   );

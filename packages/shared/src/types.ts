@@ -24,7 +24,7 @@ export interface CliProgram {
   defaultWorkingDir?: string;
 }
 
-export type SurfaceMode = 'chat' | 'terminal';
+export type SurfaceMode = 'chat';
 
 export type SurfaceRequirement =
   | 'chat-safe'
@@ -69,20 +69,29 @@ export interface ChatState {
   transcriptUpdatedAt?: Date;
 }
 
+export type ChatActionSource = 'terminal' | 'transcript';
+
 export type ChatActionRequest =
   | {
       id: string;
       kind: 'confirm';
       prompt: string;
       options: [ChatActionOption, ChatActionOption];
-      source: 'terminal' | 'transcript';
+      source: ChatActionSource;
     }
   | {
       id: string;
       kind: 'single-select';
       options: ChatActionOption[];
       prompt: string;
-      source: 'terminal' | 'transcript';
+      source: ChatActionSource;
+    }
+  | {
+      context: string;
+      id: string;
+      kind: 'free-input';
+      prompt: string;
+      source: 'terminal';
     };
 
 export interface ChatActionOption {
@@ -116,13 +125,8 @@ export interface Session {
 
 export type ClientWebSocketMessage =
   | { type: 'chat:prompt'; content: string }
-  | { type: 'surface:set-mode'; mode: SurfaceMode }
-  | { type: 'terminal:init'; cols: number; rows: number; wantsControl?: boolean }
-  | { type: 'terminal:claim-control' }
   | { type: 'terminal:input'; data: string }
-  | { type: 'terminal:key'; key: TerminalKey }
-  | { type: 'terminal:ping' }
-  | { type: 'terminal:resize'; cols: number; rows: number };
+  | { type: 'terminal:key'; key: TerminalKey };
 
 export type ServerWebSocketMessage =
   | {
@@ -154,34 +158,9 @@ export type ServerWebSocketMessage =
       surfaceRequirement: SurfaceRequirement;
       terminal?: TerminalRuntime;
     }
-  // Legacy snapshot transport (deprecated for terminal rendering)
-  | { type: 'terminal:snapshot'; snapshot: TerminalSnapshot }
-  | { type: 'terminal:update'; snapshot: TerminalSnapshot }
-  // Stream transport
-  | { type: 'terminal:output'; data: string }
-  | { type: 'terminal:reset' }
-  | {
-      type: 'terminal:control-state';
-      mode: 'controller' | 'viewer';
-      canWrite: boolean;
-      controllerClientId?: string;
-      reason?: string;
-    }
-  | { type: 'terminal:status'; status: ConnectionStatus }
-  | { type: 'terminal:pong'; sessionId: string };
+  | { type: 'terminal:status'; status: ConnectionStatus };
 
-export type TerminalKey =
-  | 'ArrowDown'
-  | 'ArrowLeft'
-  | 'ArrowRight'
-  | 'ArrowUp'
-  | 'Backspace'
-  | 'Ctrl+C'
-  | 'Ctrl+D'
-  | 'Ctrl+L'
-  | 'Enter'
-  | 'Escape'
-  | 'Tab';
+export type TerminalKey = 'Enter' | 'Escape';
 
 export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
 

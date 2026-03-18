@@ -12,8 +12,7 @@ interface ChatTranscriptProps {
   chatState?: ChatState;
   isSubmittingAction?: boolean;
   messages: Message[];
-  onOpenTerminal?: () => void;
-  onSubmitAction?: (submit: string) => void;
+  onSubmitAction?: (submit: string) => boolean | Promise<boolean>;
   programIcon?: string;
   programName?: string;
   sessionId?: string;
@@ -33,7 +32,6 @@ export function ChatTranscript({
   chatState,
   isSubmittingAction = false,
   messages,
-  onOpenTerminal,
   onSubmitAction,
   programIcon = '/assets/program-icons/claude.png',
   programName = 'CLI',
@@ -112,8 +110,8 @@ export function ChatTranscript({
         </div>
         <h2 className="text-base font-semibold text-white/90">{programName} is ready</h2>
         <p className="mt-2 max-w-sm text-sm leading-6 text-white/45">
-          Chat is the default surface. Open Terminal any time for approvals, menus, or raw TUI
-          recovery.
+          Chat is the only surface now. Approvals, selections, and direct input show up as inline
+          action cards when the CLI needs attention.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           {SUGGESTED_PROMPTS.map((prompt) => (
@@ -155,11 +153,11 @@ export function ChatTranscript({
             <ChatMessage key={message.id} message={message} programIcon={programIcon} />
           )
         )}
-        {chatState?.actionRequest && onOpenTerminal && onSubmitAction ? (
+        {chatState?.actionRequest && onSubmitAction ? (
           <ChatActionCard
+            key={chatState.actionRequest.id}
             actionRequest={chatState.actionRequest}
             isSubmitting={isSubmittingAction}
-            onOpenTerminal={onOpenTerminal}
             onSubmit={onSubmitAction}
           />
         ) : null}

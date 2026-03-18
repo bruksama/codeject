@@ -433,57 +433,7 @@ export function buildTmuxSessionName(sessionId: string) {
 }
 
 function mapTerminalKeyToTmux(key: TerminalKey) {
-  switch (key) {
-    case 'ArrowDown':
-      return 'Down';
-    case 'ArrowLeft':
-      return 'Left';
-    case 'ArrowRight':
-      return 'Right';
-    case 'ArrowUp':
-      return 'Up';
-    case 'Backspace':
-      return 'BSpace';
-    case 'Ctrl+C':
-      return 'C-c';
-    case 'Ctrl+D':
-      return 'C-d';
-    case 'Ctrl+L':
-      return 'C-l';
-    case 'Enter':
-      return 'Enter';
-    case 'Escape':
-      return 'Escape';
-    case 'Tab':
-      return 'Tab';
-  }
-}
-
-function mapTerminalKeyToSequence(key: TerminalKey) {
-  switch (key) {
-    case 'ArrowDown':
-      return '\u001b[B';
-    case 'ArrowLeft':
-      return '\u001b[D';
-    case 'ArrowRight':
-      return '\u001b[C';
-    case 'ArrowUp':
-      return '\u001b[A';
-    case 'Backspace':
-      return '\u007f';
-    case 'Ctrl+C':
-      return '\u0003';
-    case 'Ctrl+D':
-      return '\u0004';
-    case 'Ctrl+L':
-      return '\u000c';
-    case 'Enter':
-      return '\r';
-    case 'Escape':
-      return '\u001b';
-    case 'Tab':
-      return '\t';
-  }
+  return key === 'Enter' ? 'Enter' : 'Escape';
 }
 
 function normalizeSize(size: Partial<TerminalSize> | undefined, fallback?: TerminalSize): TerminalSize {

@@ -59,7 +59,6 @@ function hydrateSession(session: Session): Session {
     chatState: normalizeChatState(session.chatState),
     providerRuntime: session.providerRuntime,
     sessionOptions: normalizeSessionOptions(session),
-    surfaceMode: session.surfaceMode ?? 'chat',
     surfaceRequirement: session.surfaceRequirement ?? 'terminal-available',
     terminal: normalizeTerminalRuntime(session),
     messages: session.messages.map((message) => ({
@@ -99,7 +98,6 @@ export class SessionStore {
       chatState: normalizeChatState(input.chatState),
       messages: input.messages ?? [],
       providerRuntime: input.providerRuntime,
-      surfaceMode: input.surfaceMode ?? 'chat',
       surfaceRequirement: input.surfaceRequirement ?? 'terminal-available',
     };
     await this.withSessionLock(session.id, async () => {
@@ -122,7 +120,6 @@ export class SessionStore {
           'chatState' in updates ? normalizeChatState(updates.chatState) : existing.chatState,
         providerRuntime: updates.providerRuntime ?? existing.providerRuntime,
         sessionOptions: updates.sessionOptions ?? existing.sessionOptions,
-        surfaceMode: updates.surfaceMode ?? existing.surfaceMode,
         surfaceRequirement: updates.surfaceRequirement ?? existing.surfaceRequirement,
         terminal:
           'terminal' in updates
