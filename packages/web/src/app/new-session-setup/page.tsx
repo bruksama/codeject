@@ -336,7 +336,7 @@ export default function NewSessionSetupPage() {
                     border: '1px solid rgba(124,58,237,0.25)',
                   }}
                 >
-                  {selectedProgram.icon}
+                  <ProgramIcon alt={selectedProgram.name} icon={selectedProgram.icon} size={22} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white/90 truncate">
@@ -381,7 +381,6 @@ export default function NewSessionSetupPage() {
             </>
           ) : (
             <>
-              <span>{selectedProgram?.icon || '🚀'}</span>
               <span>Create Session</span>
             </>
           )}

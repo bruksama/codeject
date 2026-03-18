@@ -33,6 +33,10 @@ export interface TunnelConfigurationInput {
   tunnelMode: TunnelMode;
 }
 
+export interface TunnelAutoStartInput {
+  autoStart: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -261,6 +265,17 @@ export const apiClient = {
     const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel/stop', {
       method: 'POST',
     });
+    return payload.tunnel;
+  },
+
+  async setTunnelAutoStart(autoStart: boolean) {
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>(
+      '/api/tunnel/auto-start',
+      {
+        body: JSON.stringify({ autoStart }),
+        method: 'PUT',
+      }
+    );
     return payload.tunnel;
   },
 };

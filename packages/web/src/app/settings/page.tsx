@@ -30,6 +30,7 @@ import ProgramIcon from '@/components/ui/program-icon';
 import QrCodeGraphic from '@/components/ui/qr-code';
 import SettingsGroup from '@/components/ui/SettingsGroup';
 import SettingsItem from '@/components/ui/SettingsItem';
+import Toggle from '@/components/ui/Toggle';
 import {
   apiClient,
   ApiError,
@@ -600,6 +601,48 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
+                      Auto-start
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">
+                      Start the named tunnel automatically when the server boots.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={Boolean(tunnelDetails?.autoStart)}
+                    disabled={tunnelBusy || !namedTunnelTokenConfigured}
+                    label="Auto-start"
+                    onChange={async (checked) => {
+                      try {
+                        const next = await apiClient.setTunnelAutoStart(checked);
+                        setTunnelDetails(next);
+                        toast.success('Auto-start setting updated');
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error ? error.message : 'Failed to update auto-start'
+                        );
+                      }
+                    }}
+                  />
+                </div>
+                {!namedTunnelTokenConfigured ? (
+                  <p className="mt-2 text-[11px] text-white/35">
+                    Save a named tunnel token to enable.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {tunnelModeInput === 'named-token' ? (
+              <div
+                className="rounded-2xl px-3 py-3"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
                       Named Tunnel
                     </p>
                     <p className="mt-1 text-xs text-white/45">
@@ -760,11 +803,6 @@ export default function SettingsPage() {
                     ? 'Quick mode returns a temporary URL each start.'
                     : 'Named mode keeps the hostname fixed and uses the saved token.'}
                 </span>
-                {tunnelDetails?.isDevelopment && (
-                  <span className="text-[11px] text-white/35 self-center">
-                    Dev mode stays manual. `Ctrl+C` stops the managed tunnel.
-                  </span>
-                )}
               </div>
             </div>
 
