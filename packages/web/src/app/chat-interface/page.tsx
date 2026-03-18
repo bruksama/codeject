@@ -96,6 +96,7 @@ export default function ChatInterfacePage() {
 
   const showTerminalRequired = hybrid.surfaceRequirement === 'terminal-required';
   const showTerminal = hybrid.surfaceMode === 'terminal';
+  const isTerminalInputDisabled = !hybrid.canWrite || hybrid.status !== 'connected';
   const isSubmittingAction =
     Boolean(pendingActionId) && pendingActionId === hybrid.chatState?.actionRequest?.id;
   const isHandlingPrompt =
@@ -158,16 +159,36 @@ export default function ChatInterfacePage() {
 
         {showTerminal ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/60">
+              <span>
+                {hybrid.terminalRole === 'controller'
+                  ? 'Controlling terminal'
+                  : 'Read only terminal'}
+              </span>
+              {hybrid.canWrite ? null : (
+                <button
+                  className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/80"
+                  onClick={hybrid.requestTerminalControl}
+                  type="button"
+                >
+                  Take control
+                </button>
+              )}
+            </div>
             <div className="min-h-0 flex-1">
               <TerminalViewport
                 onSizeChange={handleViewportSize}
-                snapshot={hybrid.snapshot}
+                onTerminalData={hybrid.onTerminalData}
+                resetToken={hybrid.resetToken}
                 status={hybrid.status}
               />
             </div>
-            <TerminalKeyStrip onKeyPress={hybrid.sendTerminalKey} />
+            <TerminalKeyStrip
+              disabled={isTerminalInputDisabled}
+              onKeyPress={hybrid.sendTerminalKey}
+            />
             <TerminalInputBar
-              disabled={hybrid.status === 'error'}
+              disabled={isTerminalInputDisabled}
               onBackspace={() => hybrid.sendTerminalKey('Backspace')}
               onEnter={() => hybrid.sendTerminalKey('Enter')}
               onSubmit={handleTerminalSubmit}

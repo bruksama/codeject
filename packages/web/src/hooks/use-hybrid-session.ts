@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
   type ChatState,
   type ChatStatePhase,
@@ -10,13 +10,11 @@ import {
   type SurfaceRequirement,
   type TerminalKey,
   type TerminalRuntime,
-  type TerminalSnapshot,
 } from '@/types';
 import { getWebSocketUrl } from '@/lib/api-client';
 import { WebSocketClient } from '@/lib/websocket-client';
 import { useAppStore } from '@/stores/useAppStore';
 
-const EMPTY_SNAPSHOT: TerminalSnapshot = { cols: 120, content: '', rows: 32, seq: 0 };
 const EMPTY_MESSAGES: Message[] = [];
 
 interface HybridSize {
@@ -25,7 +23,9 @@ interface HybridSize {
 }
 
 interface HybridState {
+  canWrite: boolean;
   chatState?: ChatState;
+  controllerClientId?: string;
   lastError: string | null;
   optimisticPrompt?: {
     acknowledgedAssistant: boolean;
@@ -34,23 +34,27 @@ interface HybridState {
     prompt: string;
     userMessage: Message;
   };
+  resetToken: number;
   sessionId?: string;
-  snapshot: TerminalSnapshot;
   status: ConnectionStatus;
   surfaceMode: SurfaceMode;
   surfaceRequirement: SurfaceRequirement;
+  terminalRole: 'controller' | 'viewer';
 }
 
 export function useHybridSession(sessionId: string | undefined, size: HybridSize) {
   const [state, setState] = useState<HybridState>({
+    canWrite: true,
     lastError: null,
-    snapshot: EMPTY_SNAPSHOT,
+    resetToken: 0,
     status: 'idle',
     surfaceMode: 'chat',
     surfaceRequirement: 'terminal-available',
+    terminalRole: 'controller',
   });
   const clientRef = useRef<WebSocketClient | null>(null);
   const sizeRef = useRef(size);
+  const terminalListenersRef = useRef(new Set<(chunk: string) => void>());
   const updateSession = useAppStore((store) => store.updateSession);
   const addMessage = useAppStore((store) => store.addMessage);
   const updateMessage = useAppStore((store) => store.updateMessage);
@@ -68,6 +72,7 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
   useEffect(() => {
     if (!sessionId) return;
 
+    const listeners = terminalListenersRef.current;
     const client = new WebSocketClient(getWebSocketUrl(sessionId), {
       onError: (message) => {
         setState((current) => ({ ...current, lastError: message, sessionId, status: 'error' }));
@@ -162,15 +167,29 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
               cols: sizeRef.current.cols,
               rows: sizeRef.current.rows,
               type: 'terminal:init',
+              wantsControl: true,
             });
             return;
-          case 'terminal:snapshot':
-          case 'terminal:update':
+          case 'terminal:output':
+            setState((current) => ({ ...current, lastError: null, sessionId }));
+            for (const listener of listeners) {
+              listener(message.data);
+            }
+            return;
+          case 'terminal:reset':
             setState((current) => ({
               ...current,
               lastError: null,
+              resetToken: current.resetToken + 1,
               sessionId,
-              snapshot: message.snapshot,
+            }));
+            return;
+          case 'terminal:control-state':
+            setState((current) => ({
+              ...current,
+              canWrite: message.canWrite,
+              controllerClientId: message.controllerClientId,
+              terminalRole: message.mode,
             }));
             return;
           default:
@@ -186,6 +205,7 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
     return () => {
       client.disconnect();
       clientRef.current = null;
+      listeners.clear();
     };
   }, [addMessage, sessionId, updateMessage, updateSession]);
 
@@ -198,14 +218,28 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
     clientRef.current.send({ cols: size.cols, rows: size.rows, type: 'terminal:resize' });
   }, [sessionId, size.cols, size.rows, state.status]);
 
+  const onTerminalData = useCallback((listener: (chunk: string) => void) => {
+    terminalListenersRef.current.add(listener);
+    return () => {
+      terminalListenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const requestTerminalControl = useCallback(() => {
+    clientRef.current?.send({ type: 'terminal:claim-control' });
+  }, []);
+
   return useMemo(
     () => ({
+      canWrite: state.canWrite,
       chatState: state.chatState,
+      controllerClientId: state.controllerClientId,
       disconnect() {
         clientRef.current?.disconnect();
       },
       lastError: state.lastError,
       messages: mergeOptimisticMessages(sessionMessages, state.optimisticPrompt),
+      onTerminalData,
       openSurface(mode: SurfaceMode) {
         if (!sessionId) return;
         setState((current) => ({ ...current, surfaceMode: mode }));
@@ -243,6 +277,8 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
         setState((current) => ({ ...current, lastError: null }));
         clientRef.current?.reconnect();
       },
+      requestTerminalControl,
+      resetToken: state.resetToken,
       sendPrompt(content: string) {
         const trimmed = content.trim();
         if (!trimmed) return false;
@@ -283,26 +319,27 @@ export function useHybridSession(sessionId: string | undefined, size: HybridSize
         clientRef.current?.send({ content: trimmed, type: 'chat:prompt' });
         return true;
       },
-      submitActionInput(data: string) {
-        if (!data.length) return false;
-        clientRef.current?.send({ data, type: 'terminal:input' });
-        clientRef.current?.send({ key: 'Enter', type: 'terminal:key' });
-        return true;
-      },
       sendTerminalInput(data: string) {
-        if (!data.length) return false;
+        if (!data.length || !state.canWrite || state.status !== 'connected') return false;
         clientRef.current?.send({ data, type: 'terminal:input' });
         return true;
       },
       sendTerminalKey(key: TerminalKey) {
+        if (!state.canWrite || state.status !== 'connected') return;
         clientRef.current?.send({ key, type: 'terminal:key' });
       },
-      snapshot: state.snapshot,
       status: state.status,
+      submitActionInput(data: string) {
+        if (!data.length || !state.canWrite || state.status !== 'connected') return false;
+        clientRef.current?.send({ data, type: 'terminal:input' });
+        clientRef.current?.send({ key: 'Enter', type: 'terminal:key' });
+        return true;
+      },
       surfaceMode: state.surfaceMode,
       surfaceRequirement: state.surfaceRequirement,
+      terminalRole: state.terminalRole,
     }),
-    [sessionId, sessionMessages, state, updateSession]
+    [onTerminalData, requestTerminalControl, sessionId, sessionMessages, state, updateSession]
   );
 }
 

@@ -1,19 +1,24 @@
 'use client';
 
 import { type MutableRefObject, useEffect, useRef } from 'react';
-import { type ConnectionStatus, type TerminalSnapshot } from '@/types';
+import { type ConnectionStatus } from '@/types';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 
 interface TerminalViewportProps {
   onSizeChange: (size: { cols: number; rows: number }) => void;
-  snapshot: TerminalSnapshot;
+  onTerminalData: (listener: (chunk: string) => void) => () => void;
+  resetToken: number;
   status: ConnectionStatus;
 }
 
-export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalViewportProps) {
+export function TerminalViewport({
+  onSizeChange,
+  onTerminalData,
+  resetToken,
+  status,
+}: TerminalViewportProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const lastSentSizeRef = useRef<{ cols: number; rows: number } | null>(null);
 
@@ -55,7 +60,13 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     terminal.focus();
 
     terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
+
+    const unsubscribe = onTerminalData((chunk) => {
+      if (!terminal.element?.isConnected) {
+        return;
+      }
+      terminal.write(chunk);
+    });
 
     const resizeObserver = new ResizeObserver(() => {
       safeFitTerminal(container, terminal, fitAddon, onSizeChange, lastSentSizeRef);
@@ -63,13 +74,13 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     resizeObserver.observe(container);
 
     return () => {
+      unsubscribe();
       resizeObserver.disconnect();
       container.removeEventListener('click', handleClick);
       terminal.dispose();
       terminalRef.current = null;
-      fitAddonRef.current = null;
     };
-  }, [onSizeChange]);
+  }, [onSizeChange, onTerminalData]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -81,18 +92,7 @@ export function TerminalViewport({ onSizeChange, snapshot, status }: TerminalVie
     const terminal = terminalRef.current;
     if (!terminal) return;
     terminal.reset();
-    terminal.write(snapshot.content, () => {
-      if (terminalRef.current !== terminal || !terminal.element?.isConnected) {
-        return;
-      }
-
-      try {
-        terminal.scrollToBottom();
-      } catch {
-        // xterm can still be mid-dispose or mid-layout when async writes flush.
-      }
-    });
-  }, [snapshot.content, snapshot.seq]);
+  }, [resetToken]);
 
   return (
     <div

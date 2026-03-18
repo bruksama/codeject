@@ -1,6 +1,6 @@
 import http from 'node:http';
 import type net from 'node:net';
-import { WebSocketServer, type WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import {
   type ClientWebSocketMessage,
   type ServerWebSocketMessage,
@@ -15,9 +15,15 @@ import { logger } from '../utils/logger.js';
 import { WebSocketSessionSync } from './websocket-session-sync.js';
 
 interface ClientContext {
+  clientId: string;
+  initialized: boolean;
   isAlive: boolean;
   sessionId: string;
   socket: WebSocket;
+  wantsControl: boolean;
+}
+interface SessionControlState {
+  controllerClientId?: string;
 }
 
 interface WebSocketHandlerDependencies {
@@ -33,32 +39,47 @@ export function createWebSocketHandler({
 }: WebSocketHandlerDependencies) {
   const websocketServer = new WebSocketServer({ noServer: true });
   const clients = new Map<WebSocket, ClientContext>();
+  const controlStates = new Map<string, SessionControlState>();
   const sessionSync = new WebSocketSessionSync(sessionStore);
+  let nextClientId = 1;
 
   websocketServer.on('connection', (socket: WebSocket, request: http.IncomingMessage, sessionId: string) => {
-    const client: ClientContext = { isAlive: true, sessionId, socket };
+    const client: ClientContext = {
+      clientId: `client-${nextClientId++}`,
+      initialized: false,
+      isAlive: true,
+      sessionId,
+      socket,
+      wantsControl: false,
+    };
     clients.set(socket, client);
+    ensureSessionControlState(sessionId);
 
     const sendFrame = (frame: ServerWebSocketMessage) => {
-      socket.send(JSON.stringify(frame));
+      safeSend(socket, frame);
     };
 
-    void handleClientConnected(sessionId, sendFrame);
+    void handleClientConnected(client, sendFrame);
 
     socket.on('pong', () => {
       client.isAlive = true;
     });
 
-    socket.on('message', (payload: Buffer) => {
-      void handleClientMessage(sessionId, payload, sendFrame);
+    socket.on('message', (payload: RawData) => {
+      void handleClientMessage(client, payload, sendFrame);
     });
 
     socket.on('close', () => {
       clients.delete(socket);
-      if (!hasActiveClientForSession(sessionId)) {
+      releaseControlIfOwned(client);
+      if (client.initialized) {
         terminalSessionManager.unobserve(sessionId);
+        client.initialized = false;
+      }
+      if (!hasActiveClientForSession(sessionId)) {
         void sessionSync.updateSessionStatus(sessionId, 'disconnected');
       }
+      broadcastControlState(sessionId);
     });
 
     socket.on('error', (error: Error) => {
@@ -68,9 +89,31 @@ export function createWebSocketHandler({
     void request;
   });
 
+  let pendingOutputSnapshot = Promise.resolve();
+
+  async function handleTerminalOutput(sessionId: string, data: string) {
+    broadcast(sessionId, { type: 'terminal:output', data });
+    const snapshot = await terminalSessionManager.getSnapshot(sessionId);
+    await sessionSupervisor.handleTerminalSnapshot(sessionId, snapshot);
+  }
+
+  function queueTerminalOutput(sessionId: string, data: string) {
+    pendingOutputSnapshot = pendingOutputSnapshot
+      .catch(() => undefined)
+      .then(() => handleTerminalOutput(sessionId, data))
+      .catch(() => undefined);
+  }
+
+  function safeQueueTerminalOutput(sessionId: string, data: string) {
+    queueTerminalOutput(sessionId, data);
+  }
+
+  terminalSessionManager.on('output', (sessionId, data) => {
+    safeQueueTerminalOutput(sessionId, data);
+  });
+
   terminalSessionManager.on('update', (sessionId, snapshot) => {
     void sessionSupervisor.handleTerminalSnapshot(sessionId, snapshot);
-    broadcast(sessionId, { type: 'terminal:update', snapshot });
   });
 
   terminalSessionManager.on('status', (sessionId, status) => {
@@ -99,7 +142,10 @@ export function createWebSocketHandler({
       if (!client.isAlive) {
         client.socket.terminate();
         clients.delete(client.socket);
-        terminalSessionManager.unobserve(client.sessionId);
+        if (client.initialized) {
+          terminalSessionManager.unobserve(client.sessionId);
+          client.initialized = false;
+        }
         continue;
       }
       client.isAlive = false;
@@ -138,7 +184,10 @@ export function createWebSocketHandler({
       for (const client of clients.values()) {
         client.socket.terminate();
         clients.delete(client.socket);
-        terminalSessionManager.unobserve(client.sessionId);
+        if (client.initialized) {
+          terminalSessionManager.unobserve(client.sessionId);
+          client.initialized = false;
+        }
       }
     },
   };
@@ -146,9 +195,33 @@ export function createWebSocketHandler({
   function broadcast(sessionId: string, frame: ServerWebSocketMessage) {
     for (const client of clients.values()) {
       if (client.sessionId === sessionId) {
-        client.socket.send(JSON.stringify(frame));
+        safeSend(client.socket, frame);
       }
     }
+  }
+
+  function safeSend(socket: WebSocket, frame: ServerWebSocketMessage) {
+    if (socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    try {
+      socket.send(JSON.stringify(frame));
+    } catch (error) {
+      logger.warn('Failed to send websocket frame', error);
+    }
+  }
+
+  function toMessageText(payload: RawData) {
+    if (typeof payload === 'string') {
+      return payload;
+    }
+    if (payload instanceof Buffer) {
+      return payload.toString();
+    }
+    if (payload instanceof ArrayBuffer) {
+      return Buffer.from(payload).toString();
+    }
+    return Buffer.concat(Array.isArray(payload) ? payload : [payload]).toString();
   }
 
   function hasActiveClientForSession(sessionId: string) {
@@ -160,23 +233,22 @@ export function createWebSocketHandler({
     return false;
   }
 
-  async function handleClientConnected(sessionId: string, sendFrame: (frame: ServerWebSocketMessage) => void) {
+  async function handleClientConnected(client: ClientContext, sendFrame: (frame: ServerWebSocketMessage) => void) {
     try {
-      const session = await sessionStore.getSession(sessionId);
+      const session = await sessionStore.getSession(client.sessionId);
       if (!session) {
         sendFrame({ type: 'terminal:error', message: 'Session not found' });
         return;
       }
 
-      await terminalSessionManager.observe(session);
-      const snapshot = await terminalSessionManager.getSnapshot(sessionId);
-      const nextSession = await sessionStore.getSession(sessionId);
-      const bootstrap = await sessionSupervisor.getBootstrap(sessionId);
-      await sessionSync.updateSessionStatus(sessionId, 'connected');
+      await terminalSessionManager.ensureSession(session);
+      const nextSession = await sessionStore.getSession(client.sessionId);
+      const bootstrap = await sessionSupervisor.getBootstrap(client.sessionId);
+      await sessionSync.updateSessionStatus(client.sessionId, 'connected');
       sendFrame({
         chatState: nextSession?.chatState,
         type: 'terminal:ready',
-        sessionId,
+        sessionId: client.sessionId,
         status: 'connected',
         surfaceMode: nextSession?.surfaceMode ?? 'chat',
         surfaceRequirement: nextSession?.surfaceRequirement ?? 'terminal-available',
@@ -187,7 +259,8 @@ export function createWebSocketHandler({
         chatState: bootstrap?.chatState,
         messages: bootstrap?.messages ?? [],
       });
-      sendFrame({ type: 'terminal:snapshot', snapshot });
+      sendControlState(sendFrame, client);
+      broadcastControlState(client.sessionId);
     } catch (error) {
       sendFrame({
         type: 'terminal:error',
@@ -196,69 +269,108 @@ export function createWebSocketHandler({
     }
   }
 
+  async function sendInitialTerminalState(
+    client: ClientContext,
+    sendFrame: (frame: ServerWebSocketMessage) => void
+  ) {
+    sendFrame({ type: 'terminal:reset' });
+    const snapshot = await terminalSessionManager.getSnapshot(client.sessionId);
+    if (snapshot.content) {
+      sendFrame({ type: 'terminal:output', data: snapshot.content });
+    }
+  }
+
+
   async function handleClientMessage(
-    sessionId: string,
-    payload: Buffer,
+    client: ClientContext,
+    payload: RawData,
     sendFrame: (frame: ServerWebSocketMessage) => void
   ) {
     try {
-      const frame = JSON.parse(payload.toString()) as ClientWebSocketMessage;
+      const frame = JSON.parse(toMessageText(payload)) as ClientWebSocketMessage;
       try {
         switch (frame.type) {
           case 'chat:prompt': {
-            const session = await sessionStore.getSession(sessionId);
+            const session = await sessionStore.getSession(client.sessionId);
             if (!session) {
               sendFrame({ type: 'terminal:error', message: 'Session not found' });
               return;
             }
             await terminalSessionManager.ensureSession(session);
-            await sessionSupervisor.handleChatPrompt(sessionId, frame.content);
-            if (!(await terminalSessionManager.sendInput(sessionId, frame.content))) {
+            await sessionSupervisor.handleChatPrompt(client.sessionId, frame.content);
+            if (!(await terminalSessionManager.sendInput(client.sessionId, frame.content))) {
               sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
               return;
             }
-            await terminalSessionManager.sendKey(sessionId, 'Enter');
-            await sessionSync.touchSession(sessionId);
+            await terminalSessionManager.sendKey(client.sessionId, 'Enter');
+            await sessionSync.touchSession(client.sessionId);
             return;
           }
           case 'surface:set-mode':
-            await sessionSupervisor.handleSurfaceModeChange(sessionId, frame.mode);
+            await sessionSupervisor.handleSurfaceModeChange(client.sessionId, frame.mode);
             return;
           case 'terminal:init': {
-            await sessionSync.persistTerminalSize(sessionId, frame.cols, frame.rows);
-            const session = await sessionStore.getSession(sessionId);
+            client.wantsControl = frame.wantsControl ?? client.wantsControl;
+            await sessionSync.persistTerminalSize(client.sessionId, frame.cols, frame.rows);
+            const session = await sessionStore.getSession(client.sessionId);
             if (!session) {
               sendFrame({ type: 'terminal:error', message: 'Session not found' });
               return;
             }
-            await terminalSessionManager.ensureSession(session);
-            const snapshot = await terminalSessionManager.getSnapshot(sessionId);
-            sendFrame({ type: 'terminal:snapshot', snapshot });
+            session.sessionOptions = {
+              ...session.sessionOptions,
+              terminal: { cols: frame.cols, rows: frame.rows },
+            };
+            if (!client.initialized) {
+              await terminalSessionManager.observe(session);
+              client.initialized = true;
+            } else {
+              await terminalSessionManager.resize(client.sessionId, {
+                cols: frame.cols,
+                rows: frame.rows,
+              });
+            }
+            claimInitialControl(client);
+            await sendInitialTerminalState(client, sendFrame);
+            sendControlState(sendFrame, client);
+            broadcastControlState(client.sessionId);
             return;
           }
+          case 'terminal:claim-control':
+            claimControl(client);
+            broadcastControlState(client.sessionId);
+            return;
           case 'terminal:input':
-            if (!(await terminalSessionManager.sendInput(sessionId, frame.data))) {
+            if (!canClientWrite(client)) {
+              sendFrame({ type: 'terminal:error', message: 'Terminal is read-only for this client' });
+              return;
+            }
+            if (!(await terminalSessionManager.sendInput(client.sessionId, frame.data))) {
               sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
               return;
             }
-            await sessionSync.touchSession(sessionId);
+            await sessionSync.touchSession(client.sessionId);
             return;
           case 'terminal:key':
-            if (!(await terminalSessionManager.sendKey(sessionId, frame.key))) {
+            if (!canClientWrite(client)) {
+              sendFrame({ type: 'terminal:error', message: 'Terminal is read-only for this client' });
+              return;
+            }
+            if (!(await terminalSessionManager.sendKey(client.sessionId, frame.key))) {
               sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
               return;
             }
-            await sessionSync.touchSession(sessionId);
+            await sessionSync.touchSession(client.sessionId);
             return;
           case 'terminal:ping':
-            sendFrame({ type: 'terminal:pong', sessionId });
+            sendFrame({ type: 'terminal:pong', sessionId: client.sessionId });
             return;
           case 'terminal:resize':
-            if (!(await terminalSessionManager.resize(sessionId, { cols: frame.cols, rows: frame.rows }))) {
+            if (!(await terminalSessionManager.resize(client.sessionId, { cols: frame.cols, rows: frame.rows }))) {
               sendFrame({ type: 'terminal:error', message: 'Terminal session is not active' });
               return;
             }
-            await sessionSync.persistTerminalSize(sessionId, frame.cols, frame.rows);
+            await sessionSync.persistTerminalSize(client.sessionId, frame.cols, frame.rows);
             return;
           default:
             sendFrame({ type: 'terminal:error', message: 'Unsupported websocket message type' });
@@ -275,4 +387,82 @@ export function createWebSocketHandler({
       sendFrame({ type: 'terminal:error', message: 'Invalid websocket frame' });
     }
   }
+
+  function ensureSessionControlState(sessionId: string) {
+    let state = controlStates.get(sessionId);
+    if (!state) {
+      state = {};
+      controlStates.set(sessionId, state);
+    }
+    return state;
+  }
+
+  function claimInitialControl(client: ClientContext) {
+    const state = ensureSessionControlState(client.sessionId);
+    if (!state.controllerClientId && client.wantsControl) {
+      state.controllerClientId = client.clientId;
+    }
+  }
+
+  function claimControl(client: ClientContext) {
+    const state = ensureSessionControlState(client.sessionId);
+    state.controllerClientId = client.clientId;
+  }
+
+  function releaseControlIfOwned(client: ClientContext) {
+    const state = controlStates.get(client.sessionId);
+    if (!state || state.controllerClientId !== client.clientId) {
+      return;
+    }
+    state.controllerClientId = findFirstClientIdForSession(client.sessionId, client.clientId);
+    if (!state.controllerClientId && !hasActiveClientForSession(client.sessionId)) {
+      controlStates.delete(client.sessionId);
+    }
+  }
+
+  function findFirstClientIdForSession(sessionId: string, excludeClientId?: string) {
+    for (const client of clients.values()) {
+      if (
+        client.sessionId === sessionId &&
+        client.clientId !== excludeClientId &&
+        client.initialized &&
+        client.wantsControl
+      ) {
+        return client.clientId;
+      }
+    }
+    for (const client of clients.values()) {
+      if (client.sessionId === sessionId && client.clientId !== excludeClientId && client.initialized) {
+        return client.clientId;
+      }
+    }
+    return undefined;
+  }
+
+  function canClientWrite(client: ClientContext) {
+    const state = ensureSessionControlState(client.sessionId);
+    return state.controllerClientId === client.clientId;
+  }
+
+  function sendControlState(sendFrame: (frame: ServerWebSocketMessage) => void, client: ClientContext) {
+    const state = ensureSessionControlState(client.sessionId);
+    const canWrite = state.controllerClientId === client.clientId;
+    sendFrame({
+      type: 'terminal:control-state',
+      canWrite,
+      controllerClientId: state.controllerClientId,
+      mode: canWrite ? 'controller' : 'viewer',
+      reason: canWrite ? undefined : 'Another client is controlling this terminal',
+    });
+  }
+
+  function broadcastControlState(sessionId: string) {
+    for (const client of clients.values()) {
+      if (client.sessionId !== sessionId) {
+        continue;
+      }
+      sendControlState((frame) => safeSend(client.socket, frame), client);
+    }
+  }
 }
+

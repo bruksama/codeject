@@ -15,10 +15,11 @@ const TERMINAL_KEYS: Array<{ key: TerminalKey; label: string }> = [
 ];
 
 interface TerminalKeyStripProps {
+  disabled?: boolean;
   onKeyPress: (key: TerminalKey) => void;
 }
 
-export function TerminalKeyStrip({ onKeyPress }: TerminalKeyStripProps) {
+export function TerminalKeyStrip({ disabled = false, onKeyPress }: TerminalKeyStripProps) {
   return (
     <div className="overflow-x-auto pb-1">
       <div className="flex min-w-max gap-2">
@@ -26,7 +27,8 @@ export function TerminalKeyStrip({ onKeyPress }: TerminalKeyStripProps) {
           <button
             key={key}
             onClick={() => onKeyPress(key)}
-            className="glass-elevated rounded-2xl px-3 py-2 text-xs font-semibold text-white/80 active:scale-[0.98]"
+            className="glass-elevated rounded-2xl px-3 py-2 text-xs font-semibold text-white/80 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={disabled}
             type="button"
           >
             {label}

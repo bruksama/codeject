@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { createHash } from 'node:crypto';
+import { spawn, type IPty } from 'node-pty';
 import {
   type CliProgram,
   type ConnectionStatus,
@@ -8,30 +8,32 @@ import {
   type TerminalSnapshot,
   type TerminalSize,
 } from '@codeject/shared';
+import {
+  expandHomePath,
+  type BaseCliAdapter,
+} from '../adapters/base-cli-adapter.js';
 import { ClaudeCodeAdapter } from '../adapters/claude-code-adapter.js';
 import { CodexAdapter } from '../adapters/codex-adapter.js';
 import { GenericCliAdapter } from '../adapters/generic-cli-adapter.js';
-import { type BaseCliAdapter } from '../adapters/base-cli-adapter.js';
 import { logger } from '../utils/logger.js';
 import { type SessionStore } from './session-store.js';
 import { MissingTmuxError, TmuxBridge, type TmuxSessionTarget } from './tmux-bridge.js';
 
 interface RuntimeState {
   idleTimer: NodeJS.Timeout | null;
-  lastDigest: string | null;
+  lastSnapshotSeq: number;
   observers: number;
-  pollTimer: NodeJS.Timeout | null;
-  seq: number;
+  pty: IPty | null;
   target: TmuxSessionTarget;
+  terminalSize: TerminalSize;
 }
 
 interface TerminalSessionManagerEvents {
   error: [sessionId: string, message: string];
+  output: [sessionId: string, chunk: string];
   status: [sessionId: string, status: ConnectionStatus];
   update: [sessionId: string, snapshot: TerminalSnapshot];
 }
-
-const POLL_INTERVAL_MS = 700;
 
 export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerEvents> {
   private readonly adapters: BaseCliAdapter[] = [
@@ -52,20 +54,21 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
 
   async ensureSession(session: Session) {
     try {
-      const runtime = this.runtimes.get(session.id);
-      if (runtime && (await this.tmuxBridge.hasPane(runtime.target.paneId))) {
-        return runtime.target;
+      const existingRuntime = this.runtimes.get(session.id);
+      if (existingRuntime && (await this.tmuxBridge.hasSession(existingRuntime.target.sessionName))) {
+        existingRuntime.terminalSize = normalizeSize(session.sessionOptions?.terminal, existingRuntime.terminalSize);
+        return existingRuntime.target;
       }
 
       const persistedTarget = await this.restorePersistedTarget(session);
       if (persistedTarget) {
         this.runtimes.set(session.id, {
-          idleTimer: runtime?.idleTimer ?? null,
-          lastDigest: null,
-          observers: runtime?.observers ?? 0,
-          pollTimer: runtime?.pollTimer ?? null,
-          seq: runtime?.seq ?? 0,
+          idleTimer: existingRuntime?.idleTimer ?? null,
+          lastSnapshotSeq: existingRuntime?.lastSnapshotSeq ?? 0,
+          observers: existingRuntime?.observers ?? 0,
+          pty: existingRuntime?.pty ?? null,
           target: persistedTarget,
+          terminalSize: normalizeSize(session.sessionOptions?.terminal, existingRuntime?.terminalSize),
         });
         this.touchRuntime(session.id, this.runtimes.get(session.id)!);
         return persistedTarget;
@@ -81,14 +84,16 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
         sessionName: buildTmuxSessionName(session.id),
         workspacePath: session.workspacePath,
       });
+
       this.runtimes.set(session.id, {
-        idleTimer: null,
-        lastDigest: null,
-        observers: runtime?.observers ?? 0,
-        pollTimer: runtime?.pollTimer ?? null,
-        seq: 0,
+        idleTimer: existingRuntime?.idleTimer ?? null,
+        lastSnapshotSeq: 0,
+        observers: existingRuntime?.observers ?? 0,
+        pty: existingRuntime?.pty ?? null,
         target,
+        terminalSize: size,
       });
+
       this.touchRuntime(session.id, this.runtimes.get(session.id)!);
       await this.sessionStore.updateSession(session.id, {
         lastMessageAt: new Date(),
@@ -136,71 +141,70 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
       throw new Error('Terminal session is not active');
     }
     runtime.observers += 1;
-    if (!runtime.pollTimer) {
-      runtime.pollTimer = setInterval(() => {
-        void this.pollSession(session.id);
-      }, POLL_INTERVAL_MS);
-    }
+    await this.ensureAttachedPty(session, runtime);
+    await this.touchSession(session.id, runtime);
   }
 
   unobserve(sessionId: string) {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return;
     runtime.observers = Math.max(0, runtime.observers - 1);
-    if (runtime.observers === 0 && runtime.pollTimer) {
-      clearInterval(runtime.pollTimer);
-      runtime.pollTimer = null;
+    if (runtime.observers === 0) {
+      this.detachPty(runtime);
     }
   }
 
   async resize(sessionId: string, size: Partial<TerminalSize>) {
-    const runtime = this.runtimes.get(sessionId);
+    const runtime = await this.getRuntimeForInteraction(sessionId);
     if (!runtime) return false;
-    const nextSize = normalizeSize(size);
+    runtime.terminalSize = normalizeSize(size, runtime.terminalSize);
     try {
-      await this.tmuxBridge.resizePane(runtime.target.paneId, nextSize.cols, nextSize.rows);
+      await this.tmuxBridge.resizePane(
+        runtime.target.paneId,
+        runtime.terminalSize.cols,
+        runtime.terminalSize.rows
+      );
     } catch (error) {
       if (isMissingTargetError(error)) {
-        await this.handleDeadPane(sessionId, runtime);
+        await this.handleDeadSession(sessionId, runtime);
         return false;
       }
       throw error;
     }
+    runtime.pty?.resize(runtime.terminalSize.cols, runtime.terminalSize.rows);
     await this.touchSession(sessionId, runtime);
     return true;
   }
 
   async sendInput(sessionId: string, input: string) {
-    const runtime = this.runtimes.get(sessionId);
+    const runtime = await this.getRuntimeForInteraction(sessionId);
     if (!runtime) return false;
     try {
       await this.tmuxBridge.sendText(runtime.target.paneId, input);
     } catch (error) {
       if (isMissingTargetError(error)) {
-        await this.handleDeadPane(sessionId, runtime);
+        await this.handleDeadSession(sessionId, runtime);
         return false;
       }
       throw error;
     }
     await this.touchSession(sessionId, runtime);
-    await this.pollSession(sessionId);
     return true;
   }
 
   async sendKey(sessionId: string, key: TerminalKey) {
-    const runtime = this.runtimes.get(sessionId);
+    const runtime = await this.getRuntimeForInteraction(sessionId);
     if (!runtime) return false;
     try {
-      await this.tmuxBridge.sendKey(runtime.target.paneId, mapTerminalKey(key));
+      await this.tmuxBridge.sendKey(runtime.target.paneId, mapTerminalKeyToTmux(key));
     } catch (error) {
       if (isMissingTargetError(error)) {
-        await this.handleDeadPane(sessionId, runtime);
+        await this.handleDeadSession(sessionId, runtime);
         return false;
       }
       throw error;
     }
     await this.touchSession(sessionId, runtime);
-    await this.pollSession(sessionId);
     return true;
   }
 
@@ -208,6 +212,7 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) return;
     this.clearRuntimeTimers(runtime);
+    this.detachPty(runtime);
     this.runtimes.delete(sessionId);
     await this.tmuxBridge.killSession(runtime.target.sessionName);
     await this.sessionStore.updateSession(sessionId, {
@@ -230,6 +235,7 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     const runtime = this.runtimes.get(sessionId);
     if (runtime) {
       this.clearRuntimeTimers(runtime);
+      this.detachPty(runtime);
       this.runtimes.delete(sessionId);
       await this.tmuxBridge.killSession(runtime.target.sessionName);
     } else if (persistedSessionName) {
@@ -252,21 +258,65 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     this.emit('status', sessionId, 'idle');
   }
 
+  private async ensureAttachedPty(session: Session, runtime: RuntimeState) {
+    if (runtime.pty) {
+      return runtime.pty;
+    }
+
+    await this.tmuxBridge.ensureAvailable();
+    const shell = process.env.SHELL || '/bin/bash';
+    const tmuxCommand = `exec tmux new -A -s ${quoteShellArg(runtime.target.sessionName)}`;
+    const pty = spawn(shell, ['-lc', tmuxCommand], {
+      cols: runtime.terminalSize.cols,
+      cwd: expandHomePath(session.workspacePath),
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+      },
+      name: 'xterm-256color',
+      rows: runtime.terminalSize.rows,
+    });
+
+    runtime.pty = pty;
+
+    pty.onData((chunk) => {
+      if (!chunk) return;
+      this.touchRuntime(session.id, runtime);
+      this.emit('output', session.id, chunk);
+    });
+
+    pty.onExit(() => {
+      runtime.pty = null;
+      void this.handlePtyExit(session, runtime);
+    });
+
+    return pty;
+  }
+
+  private detachPty(runtime: RuntimeState) {
+    if (!runtime.pty) return;
+    try {
+      runtime.pty.kill();
+    } catch {
+      // ignore; PTY may already be gone
+    }
+    runtime.pty = null;
+  }
+
   private async captureSnapshot(sessionId: string, runtime: RuntimeState) {
     const snapshot = await this.tmuxBridge.getPaneSnapshot(runtime.target.paneId);
     if (snapshot.dead) {
-      await this.handleDeadPane(sessionId, runtime);
+      await this.handleDeadSession(sessionId, runtime);
       return {
         cols: snapshot.cols,
         content: '',
         rows: snapshot.rows,
-        seq: runtime.seq,
+        seq: runtime.lastSnapshotSeq,
       };
     }
 
-    runtime.seq += 1;
+    runtime.lastSnapshotSeq += 1;
     await this.sessionStore.updateSession(sessionId, {
-      lastMessageAt: new Date(),
       status: 'connected',
       terminal: {
         ...runtime.target,
@@ -278,12 +328,29 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
       cols: snapshot.cols,
       content: snapshot.content,
       rows: snapshot.rows,
-      seq: runtime.seq,
+      seq: runtime.lastSnapshotSeq,
     };
   }
 
-  private async handleDeadPane(sessionId: string, runtime: RuntimeState) {
+  private async handlePtyExit(session: Session, runtime: RuntimeState) {
+    if (runtime.observers > 0 && (await this.tmuxBridge.hasSession(runtime.target.sessionName))) {
+      try {
+        await this.ensureAttachedPty(session, runtime);
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to reattach terminal PTY';
+        this.emit('error', session.id, message);
+      }
+    }
+
+    if (!(await this.tmuxBridge.hasSession(runtime.target.sessionName))) {
+      await this.handleDeadSession(session.id, runtime);
+    }
+  }
+
+  private async handleDeadSession(sessionId: string, runtime: RuntimeState) {
     this.clearRuntimeTimers(runtime);
+    this.detachPty(runtime);
     this.runtimes.delete(sessionId);
     await this.sessionStore.updateSession(sessionId, {
       lastMessageAt: new Date(),
@@ -291,34 +358,6 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
       terminal: undefined,
     });
     this.emit('status', sessionId, 'idle');
-  }
-
-  private async pollSession(sessionId: string) {
-    const runtime = this.runtimes.get(sessionId);
-    if (!runtime) return;
-
-    try {
-      const snapshot = await this.captureSnapshot(sessionId, runtime);
-      const digest = createHash('sha1').update(snapshot.content).digest('hex');
-      if (runtime.lastDigest === digest) {
-        return;
-      }
-      runtime.lastDigest = digest;
-      this.touchRuntime(sessionId, runtime);
-      this.emit('update', sessionId, snapshot);
-    } catch (error) {
-      if (isMissingTargetError(error)) {
-        await this.handleDeadPane(sessionId, runtime);
-        return;
-      }
-      const message = error instanceof Error ? error.message : 'Failed to capture terminal state';
-      this.emit('error', sessionId, message);
-      await this.sessionStore.updateSession(sessionId, {
-        lastMessageAt: new Date(),
-        status: 'error',
-      });
-      this.emit('status', sessionId, 'error');
-    }
   }
 
   private resolveAdapter(program: CliProgram) {
@@ -340,10 +379,25 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     };
   }
 
+  private async getRuntimeForInteraction(sessionId: string) {
+    const session = await this.sessionStore.getSession(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    await this.ensureSession(session);
+    return this.runtimes.get(sessionId) ?? null;
+  }
+
   private async stopSessionByName(sessionId: string, sessionName: string) {
     try {
       await this.tmuxBridge.killSession(sessionName);
     } finally {
+      const runtime = this.runtimes.get(sessionId);
+      if (runtime) {
+        this.clearRuntimeTimers(runtime);
+        this.detachPty(runtime);
+      }
       this.runtimes.delete(sessionId);
     }
   }
@@ -367,10 +421,6 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
   }
 
   private clearRuntimeTimers(runtime: RuntimeState) {
-    if (runtime.pollTimer) {
-      clearInterval(runtime.pollTimer);
-      runtime.pollTimer = null;
-    }
     if (runtime.idleTimer) {
       clearTimeout(runtime.idleTimer);
       runtime.idleTimer = null;
@@ -382,7 +432,7 @@ export function buildTmuxSessionName(sessionId: string) {
   return `codeject-${sessionId}`;
 }
 
-function mapTerminalKey(key: TerminalKey) {
+function mapTerminalKeyToTmux(key: TerminalKey) {
   switch (key) {
     case 'ArrowDown':
       return 'Down';
@@ -409,10 +459,37 @@ function mapTerminalKey(key: TerminalKey) {
   }
 }
 
-function normalizeSize(size: Partial<TerminalSize> | undefined): TerminalSize {
+function mapTerminalKeyToSequence(key: TerminalKey) {
+  switch (key) {
+    case 'ArrowDown':
+      return '\u001b[B';
+    case 'ArrowLeft':
+      return '\u001b[D';
+    case 'ArrowRight':
+      return '\u001b[C';
+    case 'ArrowUp':
+      return '\u001b[A';
+    case 'Backspace':
+      return '\u007f';
+    case 'Ctrl+C':
+      return '\u0003';
+    case 'Ctrl+D':
+      return '\u0004';
+    case 'Ctrl+L':
+      return '\u000c';
+    case 'Enter':
+      return '\r';
+    case 'Escape':
+      return '\u001b';
+    case 'Tab':
+      return '\t';
+  }
+}
+
+function normalizeSize(size: Partial<TerminalSize> | undefined, fallback?: TerminalSize): TerminalSize {
   return {
-    cols: Math.max(40, size?.cols ?? 120),
-    rows: Math.max(12, size?.rows ?? 32),
+    cols: Math.max(40, size?.cols ?? fallback?.cols ?? 120),
+    rows: Math.max(12, size?.rows ?? fallback?.rows ?? 32),
   };
 }
 

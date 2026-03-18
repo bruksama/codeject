@@ -269,13 +269,10 @@ export const apiClient = {
   },
 
   async setTunnelAutoStart(autoStart: boolean) {
-    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>(
-      '/api/tunnel/auto-start',
-      {
-        body: JSON.stringify({ autoStart }),
-        method: 'PUT',
-      }
-    );
+    const payload = await requestJson<{ tunnel: TunnelStatusResponse }>('/api/tunnel/auto-start', {
+      body: JSON.stringify({ autoStart }),
+      method: 'PUT',
+    });
     return payload.tunnel;
   },
 };

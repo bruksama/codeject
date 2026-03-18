@@ -117,7 +117,8 @@ export interface Session {
 export type ClientWebSocketMessage =
   | { type: 'chat:prompt'; content: string }
   | { type: 'surface:set-mode'; mode: SurfaceMode }
-  | { type: 'terminal:init'; cols: number; rows: number }
+  | { type: 'terminal:init'; cols: number; rows: number; wantsControl?: boolean }
+  | { type: 'terminal:claim-control' }
   | { type: 'terminal:input'; data: string }
   | { type: 'terminal:key'; key: TerminalKey }
   | { type: 'terminal:ping' }
@@ -153,9 +154,20 @@ export type ServerWebSocketMessage =
       surfaceRequirement: SurfaceRequirement;
       terminal?: TerminalRuntime;
     }
+  // Legacy snapshot transport (deprecated for terminal rendering)
   | { type: 'terminal:snapshot'; snapshot: TerminalSnapshot }
-  | { type: 'terminal:status'; status: ConnectionStatus }
   | { type: 'terminal:update'; snapshot: TerminalSnapshot }
+  // Stream transport
+  | { type: 'terminal:output'; data: string }
+  | { type: 'terminal:reset' }
+  | {
+      type: 'terminal:control-state';
+      mode: 'controller' | 'viewer';
+      canWrite: boolean;
+      controllerClientId?: string;
+      reason?: string;
+    }
+  | { type: 'terminal:status'; status: ConnectionStatus }
   | { type: 'terminal:pong'; sessionId: string };
 
 export type TerminalKey =
