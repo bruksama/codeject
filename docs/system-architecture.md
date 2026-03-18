@@ -17,7 +17,7 @@ Express + WebSocket
   -> config store trong ~/.codeject/config.json
   -> tmux runtime cho từng session
   -> transcript reader cho Claude/Codex
-  -> session supervisor cho hybrid chat-terminal
+  -> session supervisor cho chat transcript + action cards
   -> tunnel manager cho cloudflared
 ```
 
@@ -29,9 +29,9 @@ Frontend được build thành static export và được backend phục vụ tr
 
 - Next.js 16 App Router
 - Zustand store cho local UI state va backend-hydrated state
-- màn hình session list, new session, chat, terminal, settings
+- màn hình session list, new session, chat, settings
 - WebSocket client có reconnect
-- xterm viewport va mobile key strip
+- action card inline cho confirm, select, va free-input
 
 ### Backend
 
@@ -43,9 +43,9 @@ Frontend được build thành static export và được backend phục vụ tr
 - transcript parser cho Claude `.jsonl` va Codex rollout `.jsonl`
 - `tmux` bridge cho create, send-keys, resize, capture-pane, kill-session
 - terminal session manager map app session sang `tmux` target
-- session supervisor đồng bộ transcript, pending state, terminal-required signal, và action request
+- session supervisor đồng bộ transcript, pending state, terminal-required signal, va action request theo thứ tự transcript structured -> snapshot structured -> snapshot generic prompt
 - tunnel manager quản lý một process `cloudflared`
-- websocket handler cho chat, surface, terminal, heartbeat
+- websocket handler cho chat, action submission, runtime status, va heartbeat
 
 ### Shared
 
@@ -72,7 +72,7 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 - transcript chat: được suy ra để phục vụ UX
 - session/config persistence: lưu dưới `~/.codeject`
 
-Điều này có nghĩa là chat UI có thể gọn và thân thiện hơn, nhưng terminal vẫn là đường lui chính xác nhất khi transcript extraction mơ hồ.
+Điều này có nghĩa là chat UI là bề mặt chính. Khi CLI chờ phản hồi, frontend hiển thị action card dựa trên transcript hoặc terminal snapshot thay vì render terminal viewport trực tiếp. Free-input card chỉ xóa draft sau khi gửi thành công va giữ disabled cho tới khi action hiện tại đổi, biến mất, hoặc connection rớt.
 
 ## Persistence
 
@@ -104,4 +104,5 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 - remote access bắt buộc có `cloudflared`
 - terminal snapshot hiện vẫn cập nhật theo content đầy đủ, chưa diff stream
 - action extraction trong chat mới dừng ở mức đơn giản
-- terminal vẫn là fallback path cuối cùng
+- web UI không còn raw terminal viewport; prompt text kiểu `Project name:` hay `Paste token:` sẽ rơi về free-input card
+- opaque arrow-key hoặc full-screen TUI vẫn chưa map sạch sang chat card

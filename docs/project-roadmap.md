@@ -11,7 +11,7 @@ Tất cả các phase xây dựng chính đã hoàn thành:
 - Phase 1: monorepo và frontend import
 - Phase 2: backend core, auth, persistence, WebSocket
 - Phase 3: `tmux` terminal bridge
-- Phase 4: hybrid chat-terminal experience
+- Phase 4: chat-first action card experience
 - Phase 5: remote tunnel và remote auth flow
 
 ## Đã giao
@@ -33,8 +33,7 @@ Tất cả các phase xây dựng chính đã hoàn thành:
 ### Frontend
 
 - session list, new session, settings, CLI program editor
-- hybrid chat surface va terminal fallback
-- mobile terminal controls
+- chat-first session view va inline action cards
 - compact chat composer và transcript scroll behavior tốt hơn
 
 ### Transcript và supervisor
@@ -42,7 +41,7 @@ Tất cả các phase xây dựng chính đã hoàn thành:
 - ưu tiên transcript của Claude/Codex nếu có
 - fallback về terminal snapshot khi cần
 - pending assistant indicator inline
-- simple confirm va numbered single-select action cards
+- confirm, numbered single-select, va free-input action cards
 - Codex transcript refresh an toàn hơn khi file rollout thay đổi
 
 ## Giai đoạn tiếp theo
@@ -65,9 +64,19 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 - accent color đã wire vào token UI thật; default program icons dùng local bundled brand assets
 - browser-level verification đã chạy lại trên mobile viewport; một regression ở active nav với trailing slash đã được sửa
 
+## Cleanup cập nhật 2026-03-19
+
+- terminal viewport, key strip, va hybrid surface toggle đã được gỡ khỏi frontend
+- websocket protocol phía web đã rút về chat prompt, action input, special key, runtime status, va errors
+- action card hiện hỗ trợ confirm, single-select, va free-input để thay terminal fallback trong web UI
+- generic prompt text như `Project name:` va `Paste token:` đã được recover lại thành free-input card
+- free-input draft không còn bị xóa khi submit fail; card chỉ re-enable theo state websocket thật thay vì timer
+- `@xterm/xterm` va `@xterm/addon-fit` đã được gỡ khỏi web package
+
 ## Ranh giới hiện tại
 
 - host vẫn cần `tmux`
 - remote access vẫn cần `cloudflared`
 - transcript chat vẫn là best-effort extraction
-- terminal vẫn là fallback path cuối cùng cho approval, menu, và TUI
+- web UI không còn terminal viewport; approval, menu, va input lạ đi qua action card va free-input fallback
+- opaque arrow-key hoặc full-screen TUI vẫn là giới hạn đã biết

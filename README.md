@@ -10,7 +10,7 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 
 - Xem các session đang chạy từ trình duyệt trên điện thoại hoặc máy tính.
 - Gửi prompt nhanh qua chat surface.
-- Quay lại terminal khi cần thao tác trực tiếp, approval, hoặc TUI phức tạp.
+- Trả lời approval, lựa chọn, và prompt nhập liệu trực tiếp qua action card trong chat.
 - Truy cập từ xa qua Cloudflare Tunnel mà vẫn giữ runtime trên máy của chính bạn.
 
 ## Tính năng chính
@@ -18,7 +18,8 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Tạo, lưu, khôi phục và xóa nhiều session CLI.
 - Chọn chương trình CLI như Claude Code, Codex hoặc generic shell cho từng session.
 - Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
-- Terminal surface làm đường lui chính xác khi cần thao tác sâu.
+- Inline action cards cho confirm, select, và free-text input khi CLI chờ phản hồi.
+- Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
 - Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
 - Hỗ trợ quick tunnel mặc định và named tunnel token-based cho domain riêng.
@@ -65,13 +66,17 @@ Chi tiết hơn xem `docs/getting-started.md`.
    - Chọn chương trình CLI phù hợp.
    - Lưu session để có thể khôi phục sau.
 3. Gửi prompt qua chat surface và quan sát trả lời.
-4. Khi cần thao tác chi tiết:
-   - Chuyển sang terminal surface để gửi lệnh trực tiếp.
+4. Khi CLI cần approval, chọn option, hoặc nhập liệu:
+   - Trả lời ngay trong action card được render trong chat.
 5. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
    - Quick tunnel: zero-setup, URL tạm.
    - Named tunnel: URL cố định trên domain Cloudflare của bạn.
 
 Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.md`.
+
+Giới hạn hiện tại:
+
+- Opaque arrow-key hoặc full-screen TUI chưa phải chat card thực sự; hỗ trợ tốt nhất hiện tại là prompt text, approval, và numbered select.
 
 ## Kiến trúc và công nghệ
 

@@ -19,7 +19,7 @@
 
 ## Key flows
 
-- User opens the web UI → creates a session → selects a CLI program → server maps that session to a tmux target → web shows chat and terminal for that target.
+- User opens the web UI → creates a session → selects a CLI program → server maps that session to a tmux target → web shows chat plus inline action cards for approvals, selects, and generic text prompts.
 - Optional: server manages a single Cloudflare Tunnel process to expose the local web UI remotely, either as a quick tunnel or a named token-based tunnel.
 
 ## Runtime model

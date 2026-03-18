@@ -9,18 +9,10 @@ Single WebSocket endpoint per session:
 
 - `chat:prompt`
   - Purpose: send a new user prompt to the underlying CLI assistant.
-- `surface:set-mode`
-  - Purpose: switch between chat surface and terminal surface.
-- `terminal:init`
-  - Purpose: initialize terminal for the current session.
 - `terminal:input`
-  - Purpose: send text input to the terminal.
+  - Purpose: send text input to the tmux-backed CLI runtime.
 - `terminal:key`
-  - Purpose: send special key sequences to the terminal.
-- `terminal:resize`
-  - Purpose: inform server of terminal size changes.
-- `terminal:ping`
-  - Purpose: keep-alive / latency measurement.
+  - Purpose: send supported special keys (`Enter`, `Escape`) for action submission or interrupt.
 
 ## Server → Client events
 
@@ -31,17 +23,11 @@ Single WebSocket endpoint per session:
 - `chat:update`
   - Purpose: update existing chat message(s) or chat state.
 - `surface:update`
-  - Purpose: inform client about current surface mode and related state.
+  - Purpose: inform client about current action-request / terminal-required state.
+  - Notes: `chatState.actionRequest` may be `confirm`, `single-select`, or `free-input`; clients should treat the action as complete only when the action id changes, disappears, or the connection drops.
 - `terminal:ready`
-  - Purpose: signal that terminal for this session is ready.
-- `terminal:snapshot`
-  - Purpose: send a full terminal snapshot (current buffer).
-- `terminal:update`
-  - Purpose: send incremental terminal updates (if available).
+  - Purpose: signal that the tmux-backed session is ready and share runtime metadata.
 - `terminal:status`
-  - Purpose: send status information about the terminal runtime.
+  - Purpose: send status information about the tmux-backed runtime.
 - `terminal:error`
-  - Purpose: report terminal-related errors.
-- `terminal:pong`
-  - Purpose: respond to `terminal:ping`.
-
+  - Purpose: report runtime or action-submission errors.

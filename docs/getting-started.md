@@ -49,7 +49,7 @@ Trong chế độ này, frontend và backend chạy song song, hot reload cho vi
    - Lưu session để có thể khôi phục sau này.
 3. Mở session vừa tạo:
    - Gửi prompt qua **chat surface**.
-   - Khi cần thao tác sâu hơn, chuyển sang **terminal surface** và chạy lệnh trực tiếp.
+   - Khi CLI chờ approval, chọn option, hoặc nhập liệu, trả lời ngay trong **action card** của chat.
 
 ## Remote access (tùy chọn)
 

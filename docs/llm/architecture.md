@@ -4,7 +4,7 @@
 
 ### Web (`packages/web`)
 
-- Role: mobile-first React UI for listing sessions, creating sessions, viewing chat, and interacting with the terminal.
+- Role: mobile-first React UI for listing sessions, creating sessions, viewing chat, and responding to CLI prompts via inline action cards.
 - Technology: Next.js 16 (App Router), React 19, Tailwind CSS 4, Zustand.
 - Talks to server via:
   - HTTP REST API under `/api/*`.
@@ -19,6 +19,7 @@
   - Expose `/api/*` routes for health, auth, sessions, config, tunnel.
   - Manage per-session mapping to tmux runtimes.
   - Read and write config and sessions under `~/.codeject`.
+  - Derive chat action cards in this order: transcript structured prompt -> snapshot structured prompt -> snapshot generic free-input prompt.
   - Manage a single Cloudflare Tunnel process for remote access.
 
 ### Shared (`packages/shared`)
@@ -63,7 +64,8 @@
 2. Web connects to `/ws/:sessionId`.
 3. User sends a prompt (`chat:prompt` event).
 4. Server forwards to the underlying CLI program via tmux.
-5. Transcript reader and terminal snapshot logic update chat messages and terminal view.
+5. Transcript reader and terminal snapshot logic update chat messages and action-card state.
+6. Generic tail prompts such as `Project name:` or `Paste token:` become `free-input` cards in chat.
 
 ### Remote access flow
 
@@ -78,3 +80,4 @@
 - Remote access **requires** `cloudflared` on the host.
 - Runtime source of truth is tmux; chat transcript is derived UX state.
 - Local requests bypass auth; non-local always require bearer auth.
+- Opaque arrow-key or full-screen TUIs are still not first-class chat cards.
