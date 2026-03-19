@@ -12,16 +12,31 @@ interface ResolvedTranscript {
   kind: 'claude' | 'codex';
 }
 
-interface ProviderTranscriptResult {
-  content: string | null;
-  didPersistMetadata: boolean;
-  updatedAt?: Date;
-}
-
 interface ProviderRuntimeMetadata {
   provider: 'claude' | 'codex';
   providerSessionId?: string;
   transcriptPath?: string;
+}
+
+export type ProviderTranscriptState =
+  | { provider: 'claude' | 'codex'; status: 'none'; updatedAt?: Date }
+  | {
+      provider: 'claude' | 'codex';
+      status: 'working';
+      providerMessageId?: string;
+      updatedAt?: Date;
+    }
+  | {
+      content: string;
+      provider: 'claude' | 'codex';
+      providerMessageId?: string;
+      status: 'final';
+      updatedAt?: Date;
+    };
+
+interface ProviderTranscriptResult {
+  didPersistMetadata: boolean;
+  state: ProviderTranscriptState | null;
 }
 
 export class ProviderTranscriptReader {
@@ -29,13 +44,23 @@ export class ProviderTranscriptReader {
 
   constructor(private readonly sessionStore: SessionStore) {}
 
-  async readAssistantMessage(session: Session) {
+  async readTranscriptState(session: Session) {
+    const provider = getTranscriptProvider(session);
+    if (!provider) {
+      return {
+        didPersistMetadata: false,
+        state: null,
+      } satisfies ProviderTranscriptResult;
+    }
+
     const resolved = await this.resolveTranscriptPath(session);
     if (!resolved) {
       return {
-        content: null,
         didPersistMetadata: false,
-        updatedAt: undefined,
+        state: {
+          provider,
+          status: 'none',
+        },
       } satisfies ProviderTranscriptResult;
     }
 
@@ -49,10 +74,10 @@ export class ProviderTranscriptReader {
         providerSessionId: transcript?.sessionId,
         transcriptPath: resolved.filePath,
       });
+      const state = downgradeStaleFinalState(session, mapClaudeTranscriptState(transcript, updatedAt));
       return {
-        content: transcript?.lastAssistantMessage || null,
         didPersistMetadata,
-        updatedAt,
+        state,
       } satisfies ProviderTranscriptResult;
     }
 
@@ -62,10 +87,10 @@ export class ProviderTranscriptReader {
       providerSessionId: rollout?.sessionId,
       transcriptPath: resolved.filePath,
     });
+    const state = downgradeStaleFinalState(session, mapCodexTranscriptState(rollout, updatedAt));
     return {
-      content: rollout?.lastAssistantMessage || null,
       didPersistMetadata,
-      updatedAt,
+      state,
     } satisfies ProviderTranscriptResult;
   }
 
@@ -188,11 +213,27 @@ async function fileExists(filePath: string) {
 }
 
 function isClaudeSession(session: Session) {
-  return session.cliProgram.id === 'claude-code' || session.cliProgram.command.includes('claude');
+  return getTranscriptProvider(session) === 'claude';
 }
 
 function isCodexSession(session: Session) {
-  return session.cliProgram.id === 'codex' || /\bcodex\b/.test(session.cliProgram.command);
+  return getTranscriptProvider(session) === 'codex';
+}
+
+export function getTranscriptProvider(session: Session) {
+  if (session.providerRuntime?.provider === 'claude' || session.providerRuntime?.provider === 'codex') {
+    return session.providerRuntime.provider;
+  }
+
+  if (session.cliProgram.id === 'claude-code' || session.cliProgram.command.includes('claude')) {
+    return 'claude';
+  }
+
+  if (session.cliProgram.id === 'codex' || /\bcodex\b/.test(session.cliProgram.command)) {
+    return 'codex';
+  }
+
+  return null;
 }
 
 function normalizeWorkspacePath(workspacePath: string) {
@@ -220,4 +261,106 @@ async function shouldRefreshTranscriptPath(session: Session, filePath: string) {
   }
 
   return stats.mtimeMs <= transcriptUpdatedAt;
+}
+
+function mapClaudeTranscriptState(
+  transcript:
+    | {
+        finalAssistantMessage: string;
+        hasAssistantActivity: boolean;
+        lastAssistantMessageId: string | null;
+        lastFinalMessageId: string | null;
+      }
+    | null,
+  updatedAt?: Date
+): ProviderTranscriptState {
+  if (!transcript?.hasAssistantActivity) {
+    return {
+      provider: 'claude',
+      status: 'none',
+      updatedAt,
+    };
+  }
+
+  const finalContent = transcript.finalAssistantMessage.trim();
+  if (
+    finalContent &&
+    transcript.lastFinalMessageId &&
+    transcript.lastFinalMessageId === transcript.lastAssistantMessageId
+  ) {
+    return {
+      content: finalContent,
+      provider: 'claude',
+      providerMessageId: transcript.lastFinalMessageId ?? undefined,
+      status: 'final',
+      updatedAt,
+    };
+  }
+
+  return {
+    provider: 'claude',
+    providerMessageId: transcript.lastAssistantMessageId ?? undefined,
+    status: 'working',
+    updatedAt,
+  };
+}
+
+function mapCodexTranscriptState(
+  transcript:
+    | {
+        finalAssistantMessage: string;
+        hasAssistantActivity: boolean;
+        lastAssistantMessageId: string | null;
+        lastFinalMessageId: string | null;
+      }
+    | null,
+  updatedAt?: Date
+): ProviderTranscriptState {
+  if (!transcript?.hasAssistantActivity) {
+    return {
+      provider: 'codex',
+      status: 'none',
+      updatedAt,
+    };
+  }
+
+  const finalContent = transcript.finalAssistantMessage.trim();
+  if (
+    finalContent &&
+    transcript.lastFinalMessageId &&
+    transcript.lastFinalMessageId === transcript.lastAssistantMessageId
+  ) {
+    return {
+      content: finalContent,
+      provider: 'codex',
+      providerMessageId: transcript.lastFinalMessageId ?? undefined,
+      status: 'final',
+      updatedAt,
+    };
+  }
+
+  return {
+    provider: 'codex',
+    providerMessageId: transcript.lastAssistantMessageId ?? undefined,
+    status: 'working',
+    updatedAt,
+  };
+}
+
+function downgradeStaleFinalState(session: Session, state: ProviderTranscriptState): ProviderTranscriptState {
+  if (state.status !== 'final') {
+    return state;
+  }
+
+  const stateUpdatedAt = state.updatedAt?.getTime();
+  const sessionTranscriptUpdatedAt = session.chatState?.transcriptUpdatedAt?.getTime();
+  if (!stateUpdatedAt || !sessionTranscriptUpdatedAt || stateUpdatedAt >= sessionTranscriptUpdatedAt) {
+    return state;
+  }
+
+  return {
+    provider: state.provider,
+    status: 'none',
+    updatedAt: state.updatedAt,
+  };
 }

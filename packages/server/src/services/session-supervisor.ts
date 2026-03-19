@@ -8,9 +8,13 @@ import {
   type SurfaceRequirement,
   type TerminalSnapshot,
 } from '@codeject/shared';
-import { ProviderTranscriptReader } from './provider-transcript-reader.js';
+import {
+  getTranscriptProvider,
+  ProviderTranscriptReader,
+  type ProviderTranscriptState,
+} from './provider-transcript-reader.js';
 import { type SessionStore } from './session-store.js';
-import { extractChatResponseFromTerminal, sanitizeOutput } from '../utils/output-sanitizer.js';
+import { extractChatResponseFromTerminal } from '../utils/output-sanitizer.js';
 import { analyzeTerminalInteraction } from '../utils/action-request-extractor.js';
 
 interface SupervisorEvents {
@@ -20,6 +24,8 @@ interface SupervisorEvents {
 }
 
 const ASSISTANT_IDLE_MS = 1200;
+const FINAL_TRANSCRIPT_SETTLE_RETRY_COUNT = 3;
+const FINAL_TRANSCRIPT_SETTLE_RETRY_MS = 120;
 
 export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   private readonly assistantTimers = new Map<string, NodeJS.Timeout>();
@@ -83,20 +89,28 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
 
   async handleStatus(sessionId: string, status: Session['status']) {
     if (status !== 'idle' && status !== 'error' && status !== 'disconnected') return;
+    if (await this.trySettleFinalOnlyProviderStatus(sessionId)) {
+      return;
+    }
+
     await this.finalizeAssistantMessage(sessionId);
   }
 
   async handleActionSubmission(sessionId: string) {
     const session = await this.sessionStore.getSession(sessionId);
     if (!session?.chatState?.actionRequest) return;
+    const trackedAssistantMessage = session.chatState.lastAssistantMessageId
+      ? session.messages.find((message) => message.id === session.chatState?.lastAssistantMessageId)
+      : undefined;
 
     const timestamp = new Date();
     const chatState: ChatState = {
       ...session.chatState,
       actionRequest: undefined,
+      lastAssistantMessageId: trackedAssistantMessage?.isStreaming ? trackedAssistantMessage.id : undefined,
       phase: 'idle',
       terminalRequiredReason: undefined,
-      transcriptUpdatedAt: timestamp,
+      transcriptUpdatedAt: session.chatState.transcriptUpdatedAt ?? timestamp,
     };
     await this.sessionStore.updateSession(sessionId, {
       chatState,
@@ -111,27 +125,23 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   async handleTerminalSnapshot(sessionId: string, snapshot: TerminalSnapshot) {
     const session = await this.sessionStore.getSession(sessionId);
     if (!session) return;
-    const transcriptResult = await this.transcriptReader.readAssistantMessage(session).catch(() => null);
-    const transcriptActionContent = transcriptResult?.content?.trim() ? transcriptResult.content : null;
-    const transcriptContent = shouldAcceptTranscriptResult(session, transcriptResult)
-      ? transcriptResult?.content ?? null
-      : null;
+    const transcriptResult = await this.transcriptReader.readTranscriptState(session).catch(() => null);
+    const transcriptState = transcriptResult?.state ?? null;
     const interaction = analyzeTerminalInteraction({
       snapshotText: snapshot.content,
-      transcriptText: transcriptActionContent,
     });
     const nextRequirement: SurfaceRequirement = interaction.requirement;
     const nextChatState = deriveChatState(session, {
       actionRequest: interaction.actionRequest,
       reason: interaction.reason,
+      transcriptState,
     });
-    const terminalAssistantContent = deriveTerminalAssistantFallback(session, snapshot.content);
-    const assistantContent =
-      transcriptContent || (interaction.requirement === 'terminal-required' ? '' : terminalAssistantContent);
+    const assistantContent = deriveAssistantMessageContent(session, transcriptState, snapshot.content);
 
     if (
       nextRequirement !== session.surfaceRequirement ||
       nextChatState.phase !== session.chatState?.phase ||
+      nextChatState.transcriptUpdatedAt?.getTime() !== session.chatState?.transcriptUpdatedAt?.getTime() ||
       nextChatState.terminalRequiredReason !== session.chatState?.terminalRequiredReason ||
       nextChatState.actionRequest?.id !== session.chatState?.actionRequest?.id
     ) {
@@ -147,6 +157,11 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     }
 
     if (!assistantContent) return;
+    if (isFinalOnlyProviderSession(session)) {
+      await this.settleAssistantMessage(sessionId, assistantContent);
+      return;
+    }
+
     await this.upsertAssistantMessage(sessionId, assistantContent);
   }
 
@@ -213,6 +228,57 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     this.scheduleAssistantFinalize(session.id);
   }
 
+  private async settleAssistantMessage(sessionId: string, content: string) {
+    this.clearAssistantTimer(sessionId);
+    const session = await this.sessionStore.getSession(sessionId);
+    if (!session) return;
+
+    const settledAssistantUpdate = deriveSettledAssistantUpdate(session, content);
+    if (!settledAssistantUpdate) return;
+
+    await this.sessionStore.updateSession(session.id, {
+      chatState: settledAssistantUpdate.chatState,
+      lastMessageAt: settledAssistantUpdate.lastMessageAt,
+      messages: settledAssistantUpdate.messages,
+    });
+
+    if (settledAssistantUpdate.emitKind === 'message') {
+      this.emit('chat:message', session.id, settledAssistantUpdate.message);
+    }
+
+    if (settledAssistantUpdate.emitKind === 'update') {
+      this.emit('chat:update', session.id, settledAssistantUpdate.message.id, settledAssistantUpdate.message.content, false);
+    }
+
+    this.emit('surface:update', session.id, {
+      chatState: settledAssistantUpdate.chatState,
+      reason: settledAssistantUpdate.chatState.terminalRequiredReason,
+      requirement: session.surfaceRequirement,
+    });
+  }
+
+  private async trySettleFinalOnlyProviderStatus(sessionId: string) {
+    for (let attempt = 0; attempt < FINAL_TRANSCRIPT_SETTLE_RETRY_COUNT; attempt += 1) {
+      const session = await this.sessionStore.getSession(sessionId);
+      if (!session || !isFinalOnlyProviderSession(session)) {
+        return false;
+      }
+
+      const transcriptResult = await this.transcriptReader.readTranscriptState(session).catch(() => null);
+      const transcriptState = transcriptResult?.state ?? null;
+      if (shouldAcceptTranscriptFinal(session, transcriptState)) {
+        await this.settleAssistantMessage(sessionId, transcriptState.content);
+        return true;
+      }
+
+      if (attempt < FINAL_TRANSCRIPT_SETTLE_RETRY_COUNT - 1) {
+        await wait(FINAL_TRANSCRIPT_SETTLE_RETRY_MS);
+      }
+    }
+
+    return false;
+  }
+
   private scheduleAssistantFinalize(sessionId: string) {
     this.clearAssistantTimer(sessionId);
     this.assistantTimers.set(
@@ -229,74 +295,22 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   }
 
   private async syncBootstrapTranscript(session: Session) {
-    const transcriptResult = await this.transcriptReader.readAssistantMessage(session).catch(() => null);
-    const transcriptContent = shouldAcceptTranscriptResult(session, transcriptResult)
-      ? transcriptResult?.content?.trim()
-      : undefined;
-    if (!transcriptContent) return session;
-
-    const trackedAssistantMessageId = session.chatState?.lastAssistantMessageId;
-    const latestAssistant = [...session.messages].reverse().find((message) => message.role === 'assistant');
-    const isAwaitingFreshAssistant =
-      !trackedAssistantMessageId &&
-      (session.chatState?.phase === 'awaiting-assistant' || session.chatState?.phase === 'streaming-assistant');
-
-    if (isAwaitingFreshAssistant && latestAssistant?.content !== transcriptContent) {
-      const timestamp = new Date();
-      const message: Message = {
-        content: transcriptContent,
-        id: uuidv4(),
-        isStreaming: false,
-        role: 'assistant',
-        timestamp,
-      };
-      const resolvedPhase =
-        session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
-
-      return (
-        (await this.sessionStore.updateSession(session.id, {
-          chatState: {
-            ...session.chatState,
-            lastAssistantMessageId: message.id,
-            phase: resolvedPhase,
-            transcriptUpdatedAt: timestamp,
-          },
-          lastMessageAt: timestamp,
-          messages: [...session.messages, message],
-        })) ?? session
-      );
-    }
-
-    const lastAssistantMessageId = trackedAssistantMessageId ?? latestAssistant?.id;
-    if (!lastAssistantMessageId) return session;
-
-    const currentMessage = session.messages.find((message) => message.id === lastAssistantMessageId);
-    const resolvedPhase =
-      session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
-
-    if (
-      currentMessage?.content === transcriptContent &&
-      !currentMessage.isStreaming &&
-      session.chatState?.phase === resolvedPhase
-    ) {
+    const transcriptResult = await this.transcriptReader.readTranscriptState(session).catch(() => null);
+    const transcriptState = transcriptResult?.state ?? null;
+    if (!shouldAcceptTranscriptFinal(session, transcriptState)) {
       return session;
     }
 
-    const timestamp = new Date();
+    const settledAssistantUpdate = deriveSettledAssistantUpdate(session, transcriptState.content);
+    if (!settledAssistantUpdate) {
+      return session;
+    }
+
     return (
       (await this.sessionStore.updateSession(session.id, {
-        chatState: {
-          ...session.chatState,
-          lastAssistantMessageId,
-          phase: resolvedPhase,
-          transcriptUpdatedAt: timestamp,
-        },
-        lastMessageAt: timestamp,
-        messages: session.messages.map((message) =>
-          message.id === lastAssistantMessageId
-            ? { ...message, content: transcriptContent, isStreaming: false, timestamp }
-            : message
-        ),
+        chatState: settledAssistantUpdate.chatState,
+        lastMessageAt: settledAssistantUpdate.lastMessageAt,
+        messages: settledAssistantUpdate.messages,
       })) ?? session
     );
   }
@@ -304,14 +318,40 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   private async finalizeAssistantMessage(sessionId: string) {
     this.clearAssistantTimer(sessionId);
     const session = await this.sessionStore.getSession(sessionId);
+    if (!session) return;
+    const resolvedPhase =
+      session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
     const messageId = session?.chatState?.lastAssistantMessageId;
-    if (!session || !messageId) return;
-    const message = session.messages.find((entry) => entry.id === messageId);
-    if (!message?.isStreaming) return;
+    const message = messageId
+      ? session.messages.find((entry) => entry.id === messageId)
+      : undefined;
+
+    if (!messageId || !message?.isStreaming) {
+      if (
+        session.chatState?.phase !== 'awaiting-assistant' &&
+        session.chatState?.phase !== 'streaming-assistant'
+      ) {
+        return;
+      }
+
+      const chatState: ChatState = {
+        ...session.chatState,
+        lastAssistantMessageId: message?.content.trim() ? message.id : undefined,
+        phase: resolvedPhase,
+      };
+      await this.sessionStore.updateSession(sessionId, { chatState });
+      this.emit('surface:update', sessionId, {
+        chatState,
+        reason: chatState.terminalRequiredReason,
+        requirement: session.surfaceRequirement,
+      });
+      return;
+    }
+
     const chatState: ChatState = {
       ...session.chatState,
       lastAssistantMessageId: message.content.trim() ? messageId : undefined,
-      phase: session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle',
+      phase: resolvedPhase,
     };
     const nextMessages = message.content.trim()
       ? session.messages.map((entry) => (entry.id === messageId ? { ...entry, isStreaming: false } : entry))
@@ -361,28 +401,98 @@ function isStaleAssistantCarryover(
   return previousSettledAssistant?.content.trim() === trimmedContent;
 }
 
-function shouldAcceptTranscriptResult(
-  session: Session,
-  transcriptResult: { content: string | null; updatedAt?: Date } | null
-) {
-  if (!transcriptResult?.content?.trim()) return false;
+interface SettledAssistantUpdate {
+  chatState: ChatState;
+  lastMessageAt: Date;
+  message: Message;
+  messages: Message[];
+  emitKind: 'message' | 'none' | 'update';
+}
 
-  const transcriptUpdatedAt = transcriptResult.updatedAt?.getTime();
-  const sessionTranscriptUpdatedAt = session.chatState?.transcriptUpdatedAt?.getTime();
-
-  if (!transcriptUpdatedAt || !sessionTranscriptUpdatedAt) {
-    return true;
+function deriveSettledAssistantUpdate(session: Session, content: string): SettledAssistantUpdate | null {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    return null;
   }
 
-  return transcriptUpdatedAt > sessionTranscriptUpdatedAt;
+  const resolvedPhase = resolveSettledAssistantPhase(session);
+  const trackedAssistantMessage = session.chatState?.lastAssistantMessageId
+    ? session.messages.find((message) => message.id === session.chatState?.lastAssistantMessageId)
+    : undefined;
+  const latestAssistant = [...session.messages].reverse().find((message) => message.role === 'assistant');
+  const targetMessage =
+    trackedAssistantMessage?.role === 'assistant'
+      ? trackedAssistantMessage
+      : latestAssistant?.role === 'assistant' && !latestAssistant.isStreaming && latestAssistant.content.trim() === trimmedContent
+        ? latestAssistant
+        : undefined;
+
+  if (isStaleAssistantCarryover(session, targetMessage, trimmedContent)) {
+    return null;
+  }
+
+  const timestamp = new Date();
+  if (!targetMessage) {
+    const message: Message = {
+      content: trimmedContent,
+      id: uuidv4(),
+      isStreaming: false,
+      role: 'assistant',
+      timestamp,
+    };
+    return {
+      chatState: {
+        ...session.chatState,
+        lastAssistantMessageId: message.id,
+        phase: resolvedPhase,
+        transcriptUpdatedAt: timestamp,
+      },
+      emitKind: 'message',
+      lastMessageAt: timestamp,
+      message,
+      messages: [...session.messages, message],
+    };
+  }
+
+  const nextMessage =
+    targetMessage.content !== trimmedContent || targetMessage.isStreaming
+      ? { ...targetMessage, content: trimmedContent, isStreaming: false, timestamp }
+      : targetMessage;
+  const emitKind =
+    nextMessage.id !== targetMessage.id
+      ? 'message'
+      : nextMessage === targetMessage
+        ? 'none'
+        : 'update';
+  const chatState: ChatState = {
+    ...session.chatState,
+    lastAssistantMessageId: nextMessage.id,
+    phase: resolvedPhase,
+    transcriptUpdatedAt: timestamp,
+  };
+
+  if (
+    emitKind === 'none' &&
+    session.chatState?.lastAssistantMessageId === nextMessage.id &&
+    session.chatState?.phase === resolvedPhase
+  ) {
+    return null;
+  }
+
+  return {
+    chatState,
+    emitKind,
+    lastMessageAt: timestamp,
+    message: nextMessage,
+    messages:
+      emitKind === 'none'
+        ? session.messages
+        : session.messages.map((message) => (message.id === nextMessage.id ? nextMessage : message)),
+  };
 }
 
 function deriveTerminalAssistantFallback(session: Session, snapshotContent: string) {
-  if (session.providerRuntime?.provider === 'claude') {
-    return deriveClaudeTerminalAssistantContent(snapshotContent, session.chatState?.lastPrompt);
-  }
-
-  if (session.providerRuntime?.provider === 'codex') {
+  if (isFinalOnlyProviderSession(session)) {
     return '';
   }
 
@@ -394,9 +504,11 @@ function deriveChatState(
   {
     actionRequest,
     reason,
+    transcriptState,
   }: {
     actionRequest?: ChatActionRequest;
     reason: string | undefined;
+    transcriptState: ProviderTranscriptState | null;
   }
 ): ChatState {
   if (reason) {
@@ -405,16 +517,88 @@ function deriveChatState(
       actionRequest,
       phase: 'terminal-required',
       terminalRequiredReason: reason,
-      transcriptUpdatedAt: new Date(),
     };
   }
   return {
     ...session.chatState,
     actionRequest: undefined,
-    phase: session.chatState?.phase === 'terminal-required' ? 'idle' : (session.chatState?.phase ?? 'idle'),
+    phase: deriveNextChatPhase(session, transcriptState),
     terminalRequiredReason: undefined,
-    transcriptUpdatedAt: new Date(),
+    transcriptUpdatedAt: resolveTranscriptCursor(session, transcriptState),
   };
+}
+
+function deriveAssistantMessageContent(
+  session: Session,
+  transcriptState: ProviderTranscriptState | null,
+  snapshotContent: string
+) {
+  if (isFinalOnlyProviderSession(session)) {
+    return shouldAcceptTranscriptFinal(session, transcriptState) ? transcriptState.content : '';
+  }
+
+  return deriveTerminalAssistantFallback(session, snapshotContent);
+}
+
+function deriveNextChatPhase(session: Session, transcriptState: ProviderTranscriptState | null): ChatState['phase'] {
+  if (isFinalOnlyProviderSession(session)) {
+    if (shouldAcceptTranscriptFinal(session, transcriptState)) {
+      return resolveSettledAssistantPhase(session);
+    }
+
+    if (transcriptState?.status === 'working') {
+      return 'awaiting-assistant';
+    }
+
+    if (
+      session.chatState?.phase === 'awaiting-assistant' ||
+      session.chatState?.phase === 'streaming-assistant'
+    ) {
+      return 'awaiting-assistant';
+    }
+  }
+
+  return session.chatState?.phase === 'terminal-required' ? 'idle' : (session.chatState?.phase ?? 'idle');
+}
+
+function shouldAcceptTranscriptFinal(
+  session: Session,
+  transcriptState: ProviderTranscriptState | null
+): transcriptState is Extract<ProviderTranscriptState, { status: 'final' }> {
+  if (transcriptState?.status !== 'final' || !transcriptState.content.trim()) {
+    return false;
+  }
+
+  const transcriptUpdatedAt = transcriptState.updatedAt?.getTime();
+  const sessionTranscriptUpdatedAt = session.chatState?.transcriptUpdatedAt?.getTime();
+
+  if (!transcriptUpdatedAt || !sessionTranscriptUpdatedAt) {
+    return true;
+  }
+
+  return transcriptUpdatedAt >= sessionTranscriptUpdatedAt;
+}
+
+function resolveTranscriptCursor(session: Session, transcriptState: ProviderTranscriptState | null) {
+  if (transcriptState?.status === 'working' && transcriptState.updatedAt) {
+    return transcriptState.updatedAt;
+  }
+
+  return session.chatState?.transcriptUpdatedAt;
+}
+
+function resolveSettledAssistantPhase(session: Session) {
+  return session.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
+}
+
+function wait(delayMs: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+function isFinalOnlyProviderSession(session: Session) {
+  return Boolean(getTranscriptProvider(session));
 }
 
 function deriveAssistantContent(content: string, lastPrompt: string | undefined) {
@@ -434,68 +618,6 @@ function deriveAssistantContent(content: string, lastPrompt: string | undefined)
 
   const text = candidateLines.join('\n').trim();
   return text && text !== trimmedPrompt ? text : '';
-}
-
-function deriveClaudeTerminalAssistantContent(content: string, lastPrompt: string | undefined) {
-  if (!lastPrompt?.trim()) return '';
-
-  const lines = sanitizeTerminalLines(content);
-  const anchorIndex = findLastPromptLine(lines, lastPrompt.trim());
-  if (anchorIndex < 0) return '';
-
-  const candidateLines = lines.slice(anchorIndex + 1).map((line) => line.trim()).filter(Boolean);
-  let answerLines: string[] = [];
-  let collecting = false;
-
-  for (const line of candidateLines) {
-    if (/^❯\s/.test(line) || /^bruk@/.test(line) || /^current:/.test(line) || isTerminalDividerLine(line)) {
-      break;
-    }
-
-    if (/^●\s+/.test(line)) {
-      const next = line.replace(/^●\s+/, '').trim();
-      if (!next || isClaudeToolInvocation(next)) {
-        collecting = false;
-        answerLines = [];
-        continue;
-      }
-      collecting = true;
-      answerLines = [next];
-      continue;
-    }
-
-    if (collecting) {
-      if (isClaudeMetaLine(line)) {
-        break;
-      }
-      answerLines.push(line);
-    }
-  }
-
-  return answerLines.join('\n').trim();
-}
-
-function sanitizeTerminalLines(content: string) {
-  return sanitizeOutput(content)
-    .split('\n')
-    .map((line) => line.trimEnd());
-}
-
-function isClaudeToolInvocation(line: string) {
-  return /^[A-Z][A-Za-z0-9_-]*\(/.test(line);
-}
-
-function isClaudeMetaLine(line: string) {
-  return (
-    /^∴\s/.test(line) ||
-    /^⎿/.test(line) ||
-    /^[-•]\s/.test(line) ||
-    /^Status:/.test(line)
-  );
-}
-
-function isTerminalDividerLine(line: string) {
-  return /^[\u2500-\u257f─━]{10,}$/.test(line);
 }
 
 /**

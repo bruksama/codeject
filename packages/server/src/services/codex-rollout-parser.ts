@@ -12,18 +12,23 @@ interface CodexRolloutEntry {
 }
 
 export interface CodexRolloutSummary {
-  lastAssistantMessage: string;
+  finalAssistantMessage: string;
+  hasAssistantActivity: boolean;
+  lastAssistantMessageId: string | null;
+  lastFinalMessageId: string | null;
   sessionId: string;
 }
 
 export async function parseCodexRolloutFile(filePath: string) {
   const raw = await fs.readFile(filePath, 'utf8');
   const lines = raw.split('\n').filter(Boolean);
-  let lastAssistantMessage = '';
-  let fallbackAssistantMessage = '';
+  let finalAssistantMessage = '';
+  let hasAssistantActivity = false;
+  let lastAssistantMessageId: string | null = null;
+  let lastFinalMessageId: string | null = null;
   let sessionId = '';
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const entry = safeJsonParse<CodexRolloutEntry>(line);
     const payload = entry?.payload;
     if (entry?.type === 'session_meta' && payload?.id) {
@@ -32,6 +37,9 @@ export async function parseCodexRolloutFile(filePath: string) {
     if (entry?.type !== 'response_item' || payload?.type !== 'message' || payload.role !== 'assistant') {
       continue;
     }
+
+    hasAssistantActivity = true;
+    lastAssistantMessageId = payload.id || `line:${index}`;
 
     const text = (payload.content ?? [])
       .filter((part) => part.type === 'output_text' && part.text)
@@ -45,17 +53,16 @@ export async function parseCodexRolloutFile(filePath: string) {
     }
 
     if (payload.phase === 'final_answer') {
-      lastAssistantMessage = text;
-      continue;
-    }
-
-    if (payload.phase !== 'commentary') {
-      fallbackAssistantMessage = text;
+      finalAssistantMessage = text;
+      lastFinalMessageId = lastAssistantMessageId;
     }
   }
 
   return {
-    lastAssistantMessage: lastAssistantMessage || fallbackAssistantMessage,
+    finalAssistantMessage,
+    hasAssistantActivity,
+    lastAssistantMessageId,
+    lastFinalMessageId,
     sessionId,
   } satisfies CodexRolloutSummary;
 }
