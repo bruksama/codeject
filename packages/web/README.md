@@ -1,91 +1,57 @@
-# Next.js
+# @codeject/web
 
-A modern Next.js 15 application built with TypeScript and Tailwind CSS.
+Next.js 16 frontend workspace for Codeject. This package provides the mobile-first UI, talks to the Express server over REST + WebSocket, and is exported as static files for production serving.
 
-## 🚀 Features
+## Development
 
-- **Next.js 15** - Latest version with improved performance and features
-- **React 19** - Latest React version with enhanced capabilities
-- **Tailwind CSS** - Utility-first CSS framework for rapid UI development
+Preferred workflow from the repo root:
 
-## 🛠️ Installation
-
-1. Install dependencies:
-  ```bash
-  npm install
-  # or
-  yarn install
-  ```
-
-2. Start the development server:
-  ```bash
-  npm run dev
-  # or
-  yarn dev
-  ```
-3. Open [http://localhost:4028](http://localhost:4028) with your browser to see the result.
-
-## 📁 Project Structure
-
-```
-nextjs/
-├── public/             # Static assets
-├── src/
-│   ├── app/            # App router components
-│   │   ├── layout.tsx  # Root layout component
-│   │   └── page.tsx    # Main page component
-│   ├── components/     # Reusable UI components
-│   ├── styles/         # Global styles and Tailwind configuration
-├── next.config.mjs     # Next.js configuration
-├── package.json        # Project dependencies and scripts
-├── postcss.config.js   # PostCSS configuration
-└── tailwind.config.js  # Tailwind CSS configuration
-
+```bash
+npm run dev
 ```
 
-## 🧩 Page Editing
+That starts:
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+- the web dev server on `http://localhost:4028`
+- the Express API/WebSocket server on `http://localhost:3500`
 
-## 🎨 Styling
+If you only want the frontend workspace:
 
-This project uses Tailwind CSS for styling with the following features:
-- Utility-first approach for rapid development
-- Custom theme configuration
-- Responsive design utilities
-- PostCSS and Autoprefixer integration
+```bash
+npm run dev -w @codeject/web
+```
 
-## 📦 Available Scripts
+In dev, the web app expects the backend at `http://127.0.0.1:3500` and WebSocket connections at `ws://127.0.0.1:3500/ws/:sessionId`.
 
-- `npm run dev` - Start development server on port 4028
-- `npm run build` - Build the application for production
-- `npm run start` - Start the development server
-- `npm run serve` - Start the production server
-- `npm run lint` - Run ESLint to check code quality
-- `npm run lint:fix` - Fix ESLint issues automatically
-- `npm run format` - Format code with Prettier
+## Production build
 
-## 📱 Deployment
+```bash
+npm run build -w @codeject/web
+```
 
-Build the application for production:
+`next.config.mjs` uses `output: 'export'`, so the build is consumed as static files under `packages/web/out`. The production entrypoint for the whole app is still the Express server in `packages/server`.
 
-  ```bash
-  npm run build
-  ```
+## Important directories
 
-## 📚 Learn More
+```text
+packages/web/
+├── src/app/              # App Router pages
+├── src/components/       # Chat, session, and shared UI components
+├── src/hooks/            # Session / websocket interaction hooks
+├── src/lib/              # HTTP and WebSocket client code
+├── src/stores/           # Zustand app state
+├── src/styles/           # Global CSS and Tailwind entrypoints
+├── public/               # Static assets and icons
+└── next.config.mjs       # Static export configuration
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial
-
-You can check out the [Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## 🙏 Acknowledgments
-
-- Built with [Rocket.new](https://rocket.new)
-- Powered by Next.js and React
-- Styled with Tailwind CSS
-
-Built with ❤️ on Rocket.new
+- `npm run dev` starts Next.js on port `4028`
+- `npm run build` creates the static export used by the server
+- `npm run start` starts a standalone Next.js server on port `4028`
+- `npm run serve` starts a standalone Next.js server on the default port
+- `npm run lint` runs ESLint
+- `npm run lint:fix` runs ESLint with fixes
+- `npm run format` formats `src/**/*.{ts,tsx,css,md,json}`
+- `npm run type-check` runs TypeScript with `tsconfig.typecheck.json`

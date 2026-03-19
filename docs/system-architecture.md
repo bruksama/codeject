@@ -43,7 +43,8 @@ Frontend được build thành static export và được backend phục vụ tr
 - transcript parser cho Claude `.jsonl` va Codex rollout `.jsonl`
 - `tmux` bridge cho create, send-keys, resize, capture-pane, kill-session
 - terminal session manager map app session sang `tmux` target
-- session supervisor đồng bộ transcript, pending state, terminal-required signal, va action request theo thứ tự transcript structured -> snapshot structured -> snapshot generic prompt
+- session supervisor đồng bộ transcript, pending state, terminal-required signal, va action request theo thứ tự snapshot structured -> snapshot generic prompt -> terminal-required reason-only fallback
+- riêng `Claude Code` va `OpenAI Codex`, assistant content chỉ được materialize khi transcript xác nhận final answer; snapshot chỉ còn là nguồn action detection
 - tunnel manager quản lý một process `cloudflared`
 - websocket handler cho chat, action submission, runtime status, va heartbeat
 
@@ -72,7 +73,13 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 - transcript chat: được suy ra để phục vụ UX
 - session/config persistence: lưu dưới `~/.codeject`
 
-Điều này có nghĩa là chat UI là bề mặt chính. Khi CLI chờ phản hồi, frontend hiển thị action card dựa trên transcript hoặc terminal snapshot thay vì render terminal viewport trực tiếp. Free-input card chỉ xóa draft sau khi gửi thành công va giữ disabled cho tới khi action hiện tại đổi, biến mất, hoặc connection rớt.
+Điều này có nghĩa là chat UI là bề mặt chính. Khi CLI chờ phản hồi, frontend ưu tiên hiển thị action card dựa trên terminal snapshot thay vì render terminal viewport trực tiếp. Nếu không suy ra được card an toàn, session vẫn bị đánh dấu `terminal-required` và UI chỉ hiện reason banner. Free-input card chỉ xóa draft sau khi gửi thành công va giữ disabled cho tới khi action hiện tại đổi, biến mất, hoặc connection rớt.
+
+Với `Claude Code` va `OpenAI Codex`, chat assistant hiện là final-only:
+
+- transcript state `working` chỉ giữ loading/pending
+- transcript state `final` mới patch bubble assistant
+- commentary, preamble, va tool-progress không còn đi vào assistant chat content
 
 ## Persistence
 
@@ -84,7 +91,8 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 ## Auth
 
 - request local: cho phép không cần bearer key
-- request không local: bắt buộc `Authorization: Bearer <key>`
+- REST request không local: bắt buộc `Authorization: Bearer <key>`
+- WebSocket không local: dùng `?token=<key>` trên `/ws/:sessionId`
 - API key được hash trước khi lưu
 - QR remote chỉ chia sẻ public URL
 
@@ -103,6 +111,7 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 - host bắt buộc có `tmux`
 - remote access bắt buộc có `cloudflared`
 - terminal snapshot hiện vẫn cập nhật theo content đầy đủ, chưa diff stream
+- `Claude Code` va `OpenAI Codex` không còn stream assistant text dần dần lên chat; UX đổi từ loading sang final answer một lần
 - action extraction trong chat mới dừng ở mức đơn giản
 - web UI không còn raw terminal viewport; prompt text kiểu `Project name:` hay `Paste token:` sẽ rơi về free-input card
 - opaque arrow-key hoặc full-screen TUI vẫn chưa map sạch sang chat card

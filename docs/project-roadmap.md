@@ -67,16 +67,18 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 ## Cleanup cập nhật 2026-03-19
 
 - terminal viewport, key strip, va hybrid surface toggle đã được gỡ khỏi frontend
-- websocket protocol phía web đã rút về chat prompt, action input, special key, runtime status, va errors
+- websocket protocol phía web đã rút về `chat:bootstrap`, `chat:message`, `chat:update`, `surface:update`, `terminal:ready`, prompt/input/key, runtime status, va errors
 - action card hiện hỗ trợ confirm, single-select, va free-input để thay terminal fallback trong web UI
 - generic prompt text như `Project name:` va `Paste token:` đã được recover lại thành free-input card
 - free-input draft không còn bị xóa khi submit fail; card chỉ re-enable theo state websocket thật thay vì timer
 - `@xterm/xterm` va `@xterm/addon-fit` đã được gỡ khỏi web package
+- `Claude Code` va `OpenAI Codex` hiện dùng final-only transcript gating: loading giữ nguyên tới khi transcript chứng minh final answer, commentary/tool-progress không còn leak vào bubble assistant
 
 ## Ranh giới hiện tại
 
 - host vẫn cần `tmux`
 - remote access vẫn cần `cloudflared`
 - transcript chat vẫn là best-effort extraction
+- `Claude Code` va `OpenAI Codex` không còn visible word-by-word streaming trong chat; đổi sang loading -> final answer để ưu tiên correctness
 - web UI không còn terminal viewport; approval, menu, va input lạ đi qua action card va free-input fallback
 - opaque arrow-key hoặc full-screen TUI vẫn là giới hạn đã biết

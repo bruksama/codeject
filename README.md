@@ -20,6 +20,7 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
 - Inline action cards cho confirm, select, và free-text input khi CLI chờ phản hồi.
 - Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
+- Với `Claude Code` và `OpenAI Codex`, chat giữ loading cho tới khi transcript xác nhận final answer; commentary và tool-progress không render thành bubble assistant.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
 - Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
 - Hỗ trợ quick tunnel mặc định và named tunnel token-based cho domain riêng.
@@ -47,7 +48,8 @@ Các bước:
    - `npm install`
 3. Chạy ở chế độ phát triển:
    - `npm run dev`
-   - Mở `http://localhost:3500`
+   - Mở UI tại `http://localhost:4028`
+   - REST API và WebSocket server chạy tại `http://localhost:3500`
 
 Để chạy production local:
 
@@ -55,13 +57,14 @@ Các bước:
    - `npm run build`
 2. Khởi động server:
    - `npm start`
-3. Server lắng nghe ở `PORT` hoặc `3500`.
+3. Mở `http://localhost:3500`
+4. Server lắng nghe ở `PORT` hoặc `3500`.
 
 Chi tiết hơn xem `docs/getting-started.md`.
 
 ## Cách sử dụng cơ bản
 
-1. Mở UI tại `http://localhost:3500`.
+1. Mở UI tại `http://localhost:4028` khi đang chạy dev, hoặc `http://localhost:3500` sau khi build + `npm start`.
 2. Tạo một session mới:
    - Chọn chương trình CLI phù hợp.
    - Lưu session để có thể khôi phục sau.
@@ -77,6 +80,7 @@ Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.m
 Giới hạn hiện tại:
 
 - Opaque arrow-key hoặc full-screen TUI chưa phải chat card thực sự; hỗ trợ tốt nhất hiện tại là prompt text, approval, và numbered select.
+- `Claude Code` va `OpenAI Codex` hiện không stream token-by-token lên chat; phản hồi chỉ hiện khi transcript có final answer an toàn.
 
 ## Kiến trúc và công nghệ
 
@@ -91,6 +95,9 @@ Tổng quan kiến trúc:
   - Phục vụ frontend static từ `packages/web/out`.
   - Cung cấp REST API dưới `/api/*`.
   - Cung cấp WebSocket dưới `/ws/:sessionId`.
+- Ở chế độ dev:
+  - Next.js dev server chạy trên `http://localhost:4028`.
+  - Express API/WebSocket server chạy trên `http://localhost:3500`.
 - Runtime terminal và session CLI được quản lý bằng `tmux`.
 - Dữ liệu cấu hình và session được lưu dưới `~/.codeject`.
 

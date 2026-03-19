@@ -12,8 +12,9 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
    - Lưu session.
 3. Gửi prompt cho Claude Code:
    - Sử dụng **chat surface** để gửi và xem trả lời.
-4. Khi Claude yêu cầu thao tác phím hoặc approval:
+4. Khi Claude yêu cầu approval, numbered select, hoặc prompt text:
    - Dùng **action card inline** trong chat để approve, chọn option, hoặc nhập phản hồi.
+   - Nếu CLI rơi vào arrow-key menu hoặc full-screen TUI, web UI hiện chỉ báo cần xử lý thủ công chứ không render terminal đầy đủ.
 
 ## 2. Quản lý nhiều session CLI song song
 
@@ -24,7 +25,7 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
    - Nhanh chóng vào lại session đang quan trọng.
 3. Trong mỗi session:
    - Dùng chat cho luồng tương tác chính.
-   - Khi CLI cần phản hồi, action card sẽ xuất hiện ngay trong transcript.
+   - Khi CLI cần phản hồi dạng confirm, numbered select, hoặc free-text, action card sẽ xuất hiện ngay trong transcript.
 
 ## 3. Bật remote access qua Cloudflare Tunnel
 

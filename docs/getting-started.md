@@ -28,9 +28,11 @@ Nếu bạn mới clone repository và muốn chạy Codeject lần đầu, hãy
 1. Chạy lệnh:
    - `npm run dev`
 2. Mở trình duyệt tại:
+   - `http://localhost:4028`
+3. Backend local vẫn chạy riêng tại:
    - `http://localhost:3500`
 
-Trong chế độ này, frontend và backend chạy song song, hot reload cho việc phát triển.
+Trong chế độ này, frontend Next.js và backend Express/WebSocket chạy song song. UI dev dùng port `4028`, còn API/WebSocket dùng port `3500`.
 
 ### Chạy ở chế độ production local
 
@@ -38,12 +40,14 @@ Trong chế độ này, frontend và backend chạy song song, hot reload cho vi
    - `npm run build`
 2. Khởi động server:
    - `npm start`
-3. Mặc định server lắng nghe ở:
+3. Mở trình duyệt tại:
+   - `http://localhost:3500`
+4. Mặc định server lắng nghe ở:
    - `PORT` (nếu đặt) hoặc `3500`
 
 ## Tạo và dùng session đầu tiên
 
-1. Mở UI tại `http://localhost:3500` trên máy tính.
+1. Mở UI tại `http://localhost:4028` nếu đang chạy dev, hoặc `http://localhost:3500` nếu đang chạy bản build.
 2. Tạo một **session mới**:
    - Chọn chương trình CLI (Claude Code, Codex, hoặc shell).
    - Lưu session để có thể khôi phục sau này.
@@ -72,9 +76,9 @@ Chi tiết thêm xem trong `docs/deployment-guide.md` và `docs/usage-recipes.md
 - **Không có `tmux`**:
   - Triệu chứng: server log báo lỗi liên quan tới `tmux`, session không tạo được.
   - Cách xử lý: cài `tmux` trên host rồi chạy lại.
-- **Port 3500 đã dùng**:
-  - Triệu chứng: không khởi động được server, báo lỗi port in use.
-  - Cách xử lý: đặt biến môi trường `PORT` sang giá trị khác trước khi chạy.
+- **Port 3500 hoặc 4028 đã dùng**:
+  - Triệu chứng: `npm run dev` không khởi động đủ cả web và server, hoặc server báo lỗi port in use.
+  - Cách xử lý: đổi `PORT` cho backend nếu `3500` bị chiếm; nếu `4028` bị chiếm thì cập nhật script dev của web hoặc giải phóng port đó trước khi chạy lại.
 - **Cloudflared chưa cài**:
   - Triệu chứng: chức năng tunnel báo lỗi khi start.
   - Cách xử lý: cài `cloudflared` hoặc tắt remote access.

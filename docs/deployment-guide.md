@@ -17,6 +17,11 @@ Lệnh cơ bản:
 - `npm run type-check`
 - `npm run build`
 
+Khi chạy `npm run dev` từ root:
+
+- Web UI chạy trên `http://localhost:4028`
+- REST API và WebSocket server chạy trên `http://localhost:3500`
+
 ## Chạy production local
 
 Build:
@@ -27,19 +32,21 @@ Run:
 
 - `npm start`
 
-Mặc định server lắng nghe ở `PORT` hoặc `3500`.
+Mở ứng dụng tại `http://localhost:3500`. Server lắng nghe ở `PORT` hoặc `3500`.
 
 ## Biến môi trường
 
-File mẫu:
+Repository hiện không ship `.env.example`. Server dùng `dotenv`, nên bạn có thể tạo file `.env` cục bộ hoặc export biến trực tiếp trong shell / service manager.
 
-- `.env.example`
+Các biến runtime đang được code đọc trực tiếp:
 
-Biến hỗ trợ:
-
-- `PORT`
-- `HOST`
-- `CODEJECT_HOME` để đổi vị trí mặc định của `~/.codeject`
+- `PORT`: đổi port server Express, mặc định `3500`
+- `HOST`: host bind của server, mặc định `0.0.0.0`
+- `CODEJECT_HOME`: đổi vị trí mặc định của `~/.codeject`
+- `CODEJECT_TUNNEL_AUTOSTART`: đặt `1` để tự start tunnel khi server khởi động
+- `CODEJECT_TUNNEL_BINARY`: đổi binary tunnel, mặc định `cloudflared`
+- `CODEJECT_TUNNEL_TARGET_URL`: override target URL mà tunnel public trỏ tới; mặc định là `http://127.0.0.1:<PORT>`
+- `NODE_ENV`: khi khác `production` thì server coi là development mode
 
 ## Lưu trữ dữ liệu
 
@@ -53,7 +60,8 @@ Remote access được cung cấp thông qua `cloudflared`.
 Điều kiện:
 
 - Host phải cài `cloudflared`.
-- Request không local phải dùng bearer key.
+- REST request không local phải dùng `Authorization: Bearer <key>`.
+- WebSocket non-local dùng `?token=<key>` trong URL `/ws/:sessionId`.
 - QR chỉ chứa public URL, không chứa secret.
 
 Hai mode được hỗ trợ:
@@ -81,7 +89,7 @@ Ghi chú:
 
 - Token được lưu local trong `~/.codeject/config.json`.
 - Token không được trả lại qua API status và không được hiển thị lại trong UI.
-- Auth Internet-facing vẫn dùng bearer key hiện có của Codeject, không dùng Cloudflare Access trong scope hiện tại.
+- Auth Internet-facing vẫn dùng cùng API key hiện có của Codeject: REST qua bearer header, WebSocket qua `?token=`. Không dùng Cloudflare Access trong scope hiện tại.
 
 ## Ghi chú vận hành
 
