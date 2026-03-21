@@ -100,7 +100,7 @@ function StatusSummary({ sessions }: { sessions: Session[] }) {
       )}
       <div className="ml-auto flex items-center gap-1">
         <Zap size={11} className="text-purple-400/60" />
-        <span className="text-[10px] text-white/30">{sessions.length} sessions</span>
+        <span className="text-[0.625rem] text-white/30">{sessions.length} sessions</span>
       </div>
     </div>
   );
@@ -174,7 +174,7 @@ export default function SessionsListPage() {
               <span className="text-lg font-bold tracking-tight accent-gradient-text">
                 Codeject
               </span>
-              <p className="text-[10px] text-white/30 -mt-0.5">CLI Assistant Bridge</p>
+              <p className="text-[0.625rem] text-white/30 -mt-0.5">CLI Assistant Bridge</p>
             </div>
           </div>
           <button
@@ -254,7 +254,7 @@ export default function SessionsListPage() {
             {/* Connected first */}
             {filteredSessions.filter((s) => s.status === 'connected').length > 0 && (
               <div className="mb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400/50 mb-2 px-1">
+                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-green-400/50 mb-2 px-1">
                   Active
                 </p>
                 {filteredSessions
@@ -268,7 +268,7 @@ export default function SessionsListPage() {
             {/* Idle */}
             {filteredSessions.filter((s) => s.status === 'idle').length > 0 && (
               <div className="mb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/50 mb-2 px-1">
+                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-blue-400/50 mb-2 px-1">
                   Idle
                 </p>
                 {filteredSessions
@@ -282,7 +282,7 @@ export default function SessionsListPage() {
             {/* Errors */}
             {filteredSessions.filter((s) => s.status === 'error').length > 0 && (
               <div className="mb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-red-400/50 mb-2 px-1">
+                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-red-400/50 mb-2 px-1">
                   Needs Attention
                 </p>
                 {filteredSessions
@@ -296,7 +296,7 @@ export default function SessionsListPage() {
             {/* Disconnected */}
             {filteredSessions.filter((s) => s.status === 'disconnected').length > 0 && (
               <div className="mb-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2 px-1">
+                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-white/20 mb-2 px-1">
                   Disconnected
                 </p>
                 {filteredSessions

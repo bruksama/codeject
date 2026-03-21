@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { SendHorizontal, Square } from 'lucide-react';
+import { ChatComposerCommandSuggestionMenu } from '@/components/chat/chat-composer-command-suggestion-menu';
+import { useChatComposerCommandSuggestions } from '@/components/chat/use-chat-composer-command-suggestions';
 
 interface ChatComposerProps {
+  cliProgramId?: string | null;
   className?: string;
   disabled?: boolean;
   errorMessage?: string | null;
   isBusy?: boolean;
+  onSuggestionMenuVisibilityChange?: (isOpen: boolean) => void;
   onInterrupt?: () => void;
   onSubmit: () => void;
   onValueChange: (value: string) => void;
@@ -18,10 +22,12 @@ const IDLE_HEIGHT = 40;
 const EXPANDED_HEIGHT = 112;
 
 export function ChatComposer({
+  cliProgramId,
   className = '',
   disabled = false,
   errorMessage,
   isBusy = false,
+  onSuggestionMenuVisibilityChange,
   onInterrupt,
   onSubmit,
   onValueChange,
@@ -54,12 +60,40 @@ export function ChatComposer({
     return () => mediaQuery.removeEventListener('change', updatePreference);
   }, []);
 
+  const {
+    acceptSuggestion,
+    commandQueryResult,
+    handleCommandMenuEscape,
+    handleCommandMenuMoveDown,
+    handleCommandMenuMoveUp,
+    handleSuggestionSelect,
+    handleValueChange,
+    isCommandMenuOpen,
+    safeActiveSuggestionIndex,
+    suggestions,
+  } = useChatComposerCommandSuggestions({
+    cliProgramId,
+    onValueChange,
+    value,
+  });
   const canSubmit = !disabled && value.trim().length > 0;
   const isExpanded = isFocused || value.includes('\n');
   const canInterrupt = !disabled && isBusy && Boolean(onInterrupt);
 
+  useEffect(() => {
+    onSuggestionMenuVisibilityChange?.(isCommandMenuOpen);
+  }, [isCommandMenuOpen, onSuggestionMenuVisibilityChange]);
+
   return (
     <div className={className}>
+      {commandQueryResult ? (
+        <ChatComposerCommandSuggestionMenu
+          activeIndex={safeActiveSuggestionIndex}
+          onSelect={handleSuggestionSelect}
+          providerPrefix={commandQueryResult.providerPrefix}
+          suggestions={suggestions}
+        />
+      ) : null}
       <div
         className="isolate flex items-end gap-2 overflow-hidden rounded-[20px] px-2.5 py-2 transition-all duration-200 shadow-[0_16px_36px_rgba(0,0,0,0.26)]"
         style={{
@@ -80,9 +114,40 @@ export function ChatComposer({
           className="auto-grow-textarea w-full flex-1 bg-transparent px-1.5 py-1 text-sm leading-6 text-white/90 placeholder:text-white/25 focus:outline-none"
           disabled={disabled}
           onBlur={() => setIsFocused(false)}
-          onChange={(event) => onValueChange(event.target.value)}
+          onChange={(event) => handleValueChange(event.target.value)}
           onFocus={() => setIsFocused(true)}
           onKeyDown={(event) => {
+            const isComposing = 'isComposing' in event.nativeEvent && event.nativeEvent.isComposing;
+
+            if (isCommandMenuOpen) {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                handleCommandMenuMoveDown();
+                return;
+              }
+
+              if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                handleCommandMenuMoveUp();
+                return;
+              }
+
+              if (
+                event.key === 'Tab' ||
+                (event.key === 'Enter' && !event.shiftKey && !isComposing)
+              ) {
+                event.preventDefault();
+                acceptSuggestion();
+                return;
+              }
+
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                handleCommandMenuEscape();
+                return;
+              }
+            }
+
             if (prefersTouchInput) {
               return;
             }
@@ -91,7 +156,7 @@ export function ChatComposer({
               return;
             }
 
-            if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === 'Enter' && !event.shiftKey && !isComposing) {
               event.preventDefault();
               if (canSubmit) {
                 onSubmit();

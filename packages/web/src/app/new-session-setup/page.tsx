@@ -285,7 +285,7 @@ export default function NewSessionSetupPage() {
           <div>
             <label htmlFor="sessionName" className="block text-sm font-medium text-white/70 mb-1.5">
               Session Name
-              <span className="ml-2 text-[10px] font-normal text-white/30 normal-case tracking-normal">
+              <span className="ml-2 text-[0.625rem] font-normal text-white/30 normal-case tracking-normal">
                 auto-generated
               </span>
             </label>
@@ -325,7 +325,7 @@ export default function NewSessionSetupPage() {
                 border: '1px solid rgba(124,58,237,0.2)',
               }}
             >
-              <p className="text-[10px] uppercase tracking-widest font-semibold text-purple-400/60 mb-3">
+              <p className="text-[0.625rem] uppercase tracking-widest font-semibold text-purple-400/60 mb-3">
                 Session Preview
               </p>
               <div className="flex items-center gap-3">

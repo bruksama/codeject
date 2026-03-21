@@ -64,7 +64,7 @@ export default function BottomTabBar() {
                 )}
               </div>
               <span
-                className={`text-[10px] font-medium tracking-wide transition-colors duration-200 ${
+                className={`text-[0.625rem] font-medium tracking-wide transition-colors duration-200 ${
                   isActive ? 'accent-text' : 'text-gray-500'
                 }`}
               >

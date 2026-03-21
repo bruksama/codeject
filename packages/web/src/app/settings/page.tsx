@@ -61,7 +61,7 @@ function TunnelStatusBadge({ status }: { status: string }) {
   }[status] || { label: status, bg: 'bg-gray-500/15 text-gray-400 border-gray-500/25' };
 
   return (
-    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.bg}`}>
+    <span className={`text-[0.625rem] font-semibold px-2 py-0.5 rounded-full border ${config.bg}`}>
       {config.label}
     </span>
   );
@@ -487,7 +487,7 @@ export default function SettingsPage() {
           <AppLogo size={32} />
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white/90">Settings</h1>
-            <p className="text-[10px] text-white/30 -mt-0.5">Codeject v{APP_VERSION}</p>
+            <p className="text-[0.625rem] text-white/30 -mt-0.5">Codeject v{APP_VERSION}</p>
           </div>
         </div>
       </header>
@@ -533,7 +533,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/90">Cloudflare Tunnel</p>
-              <p className="text-[11px] text-white/35 mt-0.5">
+              <p className="text-[0.6875rem] text-white/35 mt-0.5">
                 Manual start in dev. QR shares only the public URL.
               </p>
             </div>
@@ -625,7 +625,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 {!namedTunnelTokenConfigured ? (
-                  <p className="mt-2 text-[11px] text-white/35">
+                  <p className="mt-2 text-[0.6875rem] text-white/35">
                     Save a named tunnel token to enable.
                   </p>
                 ) : null}
@@ -649,7 +649,7 @@ export default function SettingsPage() {
                       Save the public hostname and tunnel token from your Cloudflare account.
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/50">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[0.625rem] text-white/50">
                     {namedTunnelTokenConfigured ? 'Token saved' : 'Token missing'}
                   </span>
                 </div>
@@ -682,7 +682,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-[11px] text-white/35">
+                  <p className="text-[0.6875rem] text-white/35">
                     Current hostname: {namedTunnelHostname || 'Not configured'}
                   </p>
                   <button
@@ -798,7 +798,7 @@ export default function SettingsPage() {
                 >
                   Show QR
                 </button>
-                <span className="text-[11px] text-white/35 self-center">
+                <span className="text-[0.6875rem] text-white/35 self-center">
                   {selectedTunnelMode === 'quick'
                     ? 'Quick mode returns a temporary URL each start.'
                     : 'Named mode keeps the hostname fixed and uses the saved token.'}
@@ -829,7 +829,7 @@ export default function SettingsPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
                       Browser Key
                     </p>
-                    <p className="mt-1 text-[11px] text-white/40">
+                    <p className="mt-1 text-[0.6875rem] text-white/40">
                       {remoteAccess.enabled
                         ? 'Configured for remote access'
                         : 'Rotate locally to create one'}
@@ -996,7 +996,7 @@ export default function SettingsPage() {
         <div className="flex flex-col items-center gap-1 py-6">
           <AppLogo size={28} />
           <p className="text-xs text-white/20 mt-1">Codeject · v{APP_VERSION}</p>
-          <p className="text-[10px] text-white/15">Built for developers, by developers</p>
+          <p className="text-[0.625rem] text-white/15">Built for developers, by developers</p>
         </div>
       </div>
 

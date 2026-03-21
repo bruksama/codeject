@@ -177,7 +177,7 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
 
         {/* Timestamp */}
         {showTimestamp && (
-          <span className="text-[10px] text-white/30 px-1 fade-in">
+          <span className="text-[0.625rem] text-white/30 px-1 fade-in">
             {formatTimestamp(
               message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp)
             )}

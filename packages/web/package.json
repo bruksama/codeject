@@ -47,6 +47,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
     "serve": "next start",
+    "sync:claudekit-commands": "node ./scripts/sync-engineer-kit-stable-commands.mjs",
     "type-check": "tsc -p tsconfig.typecheck.json --noEmit"
   },
   "dependencies": {

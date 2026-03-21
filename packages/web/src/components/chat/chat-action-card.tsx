@@ -20,12 +20,12 @@ export function ChatActionCard({
     <div className="mt-4 rounded-[24px] border border-amber-400/20 bg-amber-400/[0.06] p-4 text-white/90">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200/70">
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.22em] text-amber-200/70">
             {isFreeInput ? 'Input needed' : 'Quick action'}
           </p>
           <p className="mt-2 text-sm leading-6 text-white/85">{actionRequest.prompt}</p>
         </div>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white/40">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.625rem] uppercase tracking-[0.16em] text-white/40">
           {actionRequest.source}
         </span>
       </div>
@@ -87,7 +87,7 @@ function FreeInputActionForm({
         }
       }}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+      <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-white/45">
         Recent CLI output
       </p>
       <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-black/20 px-4 py-3 font-mono text-xs leading-5 text-white/70">

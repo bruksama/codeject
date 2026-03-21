@@ -13,12 +13,16 @@ import { useHybridSession } from '@/hooks/use-hybrid-session';
 import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
 
+const CHAT_COMPOSER_CLEARANCE = 'calc(58px * var(--app-font-scale))';
+const CHAT_COMPOSER_MENU_CLEARANCE = 'calc(350px * var(--app-font-scale))';
+
 export default function ChatInterfacePage() {
   const router = useRouter();
   const sessionApi = useSessionApi();
   const { sessions, activeSessionId } = useAppStore();
   const session = sessions.find((item) => item.id === activeSessionId) ?? sessions[0];
   const [chatDraft, setChatDraft] = useState('');
+  const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const hybrid = useHybridSession(session?.id);
 
   useEffect(() => {
@@ -80,12 +84,12 @@ export default function ChatInterfacePage() {
             <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]">
               <ProgramIcon alt={session.cliProgram.name} icon={session.cliProgram.icon} size={14} />
             </div>
-            <span className="min-w-0 truncate text-[13px] font-semibold text-white/90">
+            <span className="min-w-0 truncate text-[0.8125rem] font-semibold text-white/90">
               {session.name}
             </span>
             <ConnectionBadge showLabel size="sm" status={hybrid.status} />
           </div>
-          <p className="mt-0.5 truncate font-mono text-[10px] text-white/32">
+          <p className="mt-0.5 truncate font-mono text-[0.625rem] text-white/32">
             {session.workspacePath}
           </p>
         </div>
@@ -102,7 +106,7 @@ export default function ChatInterfacePage() {
       </header>
 
       <div className="mb-2 flex justify-end">
-        <div className="max-w-[52vw] truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[10px] text-white/40">
+        <div className="max-w-[52vw] truncate rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[0.625rem] text-white/40">
           {session.terminal?.sessionName ? session.terminal.sessionName : 'tmux starting'}
         </div>
       </div>
@@ -116,6 +120,9 @@ export default function ChatInterfacePage() {
           <div className="h-full min-h-0">
             <ChatTranscript
               chatState={hybrid.chatState}
+              composerClearance={
+                isCommandMenuOpen ? CHAT_COMPOSER_MENU_CLEARANCE : CHAT_COMPOSER_CLEARANCE
+              }
               isSubmittingAction={isSubmittingAction}
               messages={hybrid.messages}
               onSubmitAction={handleActionSubmit}
@@ -125,10 +132,12 @@ export default function ChatInterfacePage() {
             />
           </div>
           <ChatComposer
+            cliProgramId={session.cliProgram.id}
             className="absolute inset-x-3 bottom-3 z-20"
             disabled={hybrid.status === 'error'}
             errorMessage={hybrid.lastError}
             isBusy={isHandlingPrompt}
+            onSuggestionMenuVisibilityChange={setIsCommandMenuOpen}
             onInterrupt={() => hybrid.interruptPrompt()}
             onSubmit={() => {
               if (!hybrid.sendPrompt(chatDraft)) {

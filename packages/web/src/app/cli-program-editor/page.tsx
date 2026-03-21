@@ -395,7 +395,7 @@ function CliProgramEditorContent() {
               className="rounded-xl px-4 py-3 fade-in"
               style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)' }}
             >
-              <p className="text-[10px] uppercase tracking-widest font-semibold text-white/25 mb-1.5">
+              <p className="text-[0.625rem] uppercase tracking-widest font-semibold text-white/25 mb-1.5">
                 Preview
               </p>
               <code className="text-xs font-mono text-green-400/80 leading-relaxed break-all">
@@ -442,7 +442,7 @@ function CliProgramEditorContent() {
                 border: '1px solid rgba(124,58,237,0.15)',
               }}
             >
-              <p className="text-[10px] uppercase tracking-widest font-semibold text-purple-400/50 mb-3">
+              <p className="text-[0.625rem] uppercase tracking-widest font-semibold text-purple-400/50 mb-3">
                 Program Info
               </p>
               <div className="space-y-2">

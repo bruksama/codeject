@@ -10,6 +10,7 @@ import { type ChatState, type Message } from '@/types';
 
 interface ChatTranscriptProps {
   chatState?: ChatState;
+  composerClearance?: string;
   isSubmittingAction?: boolean;
   messages: Message[];
   onSubmitAction?: (submit: string) => boolean | Promise<boolean>;
@@ -26,10 +27,12 @@ const SUGGESTED_PROMPTS = [
 ];
 
 const BOTTOM_THRESHOLD_PX = 96;
-const COMPOSER_CLEARANCE_PX = 58;
+const DEFAULT_COMPOSER_CLEARANCE = '58px';
+const JUMP_TO_LATEST_OFFSET = '16px';
 
 export function ChatTranscript({
   chatState,
+  composerClearance = DEFAULT_COMPOSER_CLEARANCE,
   isSubmittingAction = false,
   messages,
   onSubmitAction,
@@ -102,6 +105,19 @@ export function ChatTranscript({
     return () => window.cancelAnimationFrame(frameId);
   }, [latestMessageId, scrollToLatest, showStreamingIndicator, visibleMessages.length]);
 
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      if (shouldFollowRef.current) {
+        scrollToLatest('auto');
+        return;
+      }
+
+      syncBottomState();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [composerClearance, scrollToLatest, syncBottomState]);
+
   if (!hasMessages) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-5 text-center">
@@ -138,7 +154,7 @@ export function ChatTranscript({
         ref={scrollContainerRef}
         className="flex h-full flex-col gap-4 overflow-y-auto px-1 pt-1"
         style={{
-          paddingBottom: `calc(${COMPOSER_CLEARANCE_PX}px + env(safe-area-inset-bottom, 0px))`,
+          paddingBottom: `calc(${composerClearance} + env(safe-area-inset-bottom, 0px))`,
         }}
         onScroll={syncBottomState}
       >
@@ -167,9 +183,10 @@ export function ChatTranscript({
       </div>
       {showJumpToLatest ? (
         <button
-          className="absolute bottom-[calc(74px+env(safe-area-inset-bottom,0px))] left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
+          className="absolute left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
           onClick={() => scrollToLatest('smooth')}
           style={{
+            bottom: `calc(${composerClearance} + ${JUMP_TO_LATEST_OFFSET} + env(safe-area-inset-bottom, 0px))`,
             backdropFilter: 'blur(28px)',
             WebkitBackdropFilter: 'blur(28px)',
             background:

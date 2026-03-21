@@ -177,16 +177,16 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
               <span className="text-sm font-semibold text-white/90 truncate">{session.name}</span>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <ConnectionBadge status={session.status} />
-                <span className="text-[11px] text-white/30">{relativeTime}</span>
+                <span className="text-[0.6875rem] text-white/30">{relativeTime}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="accent-text truncate text-[11px] font-medium opacity-80">
+              <span className="accent-text truncate text-[0.6875rem] font-medium opacity-80">
                 {session.cliProgram.name}
               </span>
-              <span className="text-white/20 text-[10px]">•</span>
-              <span className="text-[11px] text-white/35 truncate font-mono">
+              <span className="text-white/20 text-[0.625rem]">•</span>
+              <span className="text-[0.6875rem] text-white/35 truncate font-mono">
                 {session.workspacePath}
               </span>
             </div>

@@ -3,6 +3,8 @@
 @import "tailwindcss";
 
 :root {
+  --app-font-size: 16px;
+  --app-font-scale: 1;
   --bg-base: #08080f;
   --bg-surface: #0f0f1a;
   --bg-card: rgba(255, 255, 255, 0.04);
@@ -32,6 +34,7 @@
 html {
   background-color: var(--bg-base);
   color: var(--text-primary);
+  font-size: var(--app-font-size);
   font-family: -apple-system, 'SF Pro Display', 'DM Sans', BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
