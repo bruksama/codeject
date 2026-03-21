@@ -12,9 +12,13 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
    - Lưu session.
 3. Gửi prompt cho Claude Code:
    - Sử dụng **chat surface** để gửi và xem trả lời.
+   - Nếu token đầu tiên bắt đầu bằng `/`, composer sẽ gợi ý các ClaudeKit command ổn định từ manifest local; bạn có thể gõ dở namespace như `/ck:` rồi thêm prompt phía sau.
 4. Khi Claude yêu cầu approval, numbered select, hoặc prompt text:
    - Dùng **action card inline** trong chat để approve, chọn option, hoặc nhập phản hồi.
    - Nếu CLI rơi vào arrow-key menu hoặc full-screen TUI, web UI hiện chỉ báo cần xử lý thủ công chứ không render terminal đầy đủ.
+5. Nếu cần đọc transcript dễ hơn trên điện thoại:
+   - Vào `Settings > Appearance > Font Size`.
+   - Đổi sang mức lớn hơn hoặc nhỏ hơn; app nhớ lại theo từng trình duyệt.
 
 ## 2. Quản lý nhiều session CLI song song
 
@@ -25,7 +29,11 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
    - Nhanh chóng vào lại session đang quan trọng.
 3. Trong mỗi session:
    - Dùng chat cho luồng tương tác chính.
+   - Claude session nhận command suggestion khi token đầu bắt đầu bằng `/`; Codex session nhận command suggestion khi token đầu bắt đầu bằng `$`.
+   - Khi chọn suggestion, Codeject chỉ thay token đầu và giữ nguyên phần prompt còn lại.
    - Khi CLI cần phản hồi dạng confirm, numbered select, hoặc free-text, action card sẽ xuất hiện ngay trong transcript.
+4. Nếu một session có transcript dày hoặc chữ quá chật:
+   - đổi `Settings > Appearance > Font Size` để scale toàn bộ UI chat cho thiết bị đó.
 
 ## 3. Bật remote access qua Cloudflare Tunnel
 
@@ -33,11 +41,12 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
 2. Trong Codeject, mở phần điều khiển remote access:
    - Chọn `Quick` nếu chỉ cần URL tạm.
    - Hoặc chọn `Named`, nhập hostname + token nếu muốn dùng domain riêng.
+   - Nếu dùng `Named` lâu dài, bật thêm `Auto-start` để server tự bật tunnel khi khởi động.
    - Start Cloudflare Tunnel.
    - Lấy public URL và/hoặc quét QR code.
 3. Trên điện thoại:
    - Mở trình duyệt tới public URL.
-   - Đăng nhập bằng bearer key nếu được yêu cầu.
+   - Vào `Settings > Remote Access > Device Auth`, dán bearer key để thiết bị này tự gọi REST/WebSocket.
 4. Sử dụng giao diện như trên desktop:
    - Xem danh sách session.
    - Vào từng session để điều khiển.

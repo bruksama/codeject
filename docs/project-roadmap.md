@@ -74,6 +74,23 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 - `@xterm/xterm` va `@xterm/addon-fit` đã được gỡ khỏi web package
 - `Claude Code` va `OpenAI Codex` hiện dùng final-only transcript gating: loading giữ nguyên tới khi transcript chứng minh final answer, commentary/tool-progress không còn leak vào bubble assistant
 
+## Docs/UX cập nhật 2026-03-21
+
+- session `Claude Code` hiện gợi ý stable ClaudeKit commands khi token đầu tiên bắt đầu bằng `/`
+- session `OpenAI Codex` hiện gợi ý cùng manifest command đó khi token đầu tiên bắt đầu bằng `$`
+- autocomplete dùng checked-in manifest local thay vì scrape runtime output
+- composer cho phép gõ namespace dở dang va khi accept suggestion chỉ thay token đầu, giữ nguyên phần prompt còn lại
+- provider chưa hỗ trợ vẫn giữ hành vi composer cũ
+
+## Docs/UX cập nhật 2026-03-22
+
+- `Settings > Appearance > Font Size` đã ship với 3 mức `small`, `medium`, `large`
+- font size là preference frontend-only trong `AppSettings`, lưu theo từng browser qua Zustand/localStorage thay vì backend `~/.codeject`
+- root layout apply CSS vars trước hydration để tránh first-paint flash sai cỡ chữ
+- scale ảnh hưởng toàn app UI typography, gồm cả transcript/composer clearance để chat surface giữ readability khi đổi cỡ chữ
+- remote access named tunnel hiện có `Auto-start`; quick tunnel vẫn chỉ start thủ công
+- thiết bị remote có luồng `Device Auth` riêng để lưu bearer key trong browser sau khi mở public URL hoặc QR
+
 ## Ranh giới hiện tại
 
 - host vẫn cần `tmux`

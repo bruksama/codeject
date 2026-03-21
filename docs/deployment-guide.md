@@ -43,7 +43,7 @@ Các biến runtime đang được code đọc trực tiếp:
 - `PORT`: đổi port server Express, mặc định `3500`
 - `HOST`: host bind của server, mặc định `0.0.0.0`
 - `CODEJECT_HOME`: đổi vị trí mặc định của `~/.codeject`
-- `CODEJECT_TUNNEL_AUTOSTART`: đặt `1` để tự start tunnel khi server khởi động
+- `CODEJECT_TUNNEL_AUTOSTART`: đặt `1` để default `autoStart` là bật khi config local chưa ghi đè; chỉ có hiệu lực thực tế cho named tunnel
 - `CODEJECT_TUNNEL_BINARY`: đổi binary tunnel, mặc định `cloudflared`
 - `CODEJECT_TUNNEL_TARGET_URL`: override target URL mà tunnel public trỏ tới; mặc định là `http://127.0.0.1:<PORT>`
 - `NODE_ENV`: khi khác `production` thì server coi là development mode
@@ -69,6 +69,8 @@ Hai mode được hỗ trợ:
 - `Quick`: không cần cấu hình Cloudflare trước, nhận URL `trycloudflare.com` mới mỗi lần start.
 - `Named (token-based)`: dùng hostname cố định trên domain Cloudflare của bạn và tunnel token lưu trong Codeject.
 
+`Auto-start` chỉ khả dụng cho `Named (token-based)`. Khi bật, server sẽ tự khởi động tunnel lúc bootstrap; quick tunnel vẫn là luồng manual-only vì URL luôn ephemeral.
+
 ### Named tunnel token-based
 
 Chuẩn bị trên Cloudflare:
@@ -90,9 +92,11 @@ Ghi chú:
 - Token được lưu local trong `~/.codeject/config.json`.
 - Token không được trả lại qua API status và không được hiển thị lại trong UI.
 - Auth Internet-facing vẫn dùng cùng API key hiện có của Codeject: REST qua bearer header, WebSocket qua `?token=`. Không dùng Cloudflare Access trong scope hiện tại.
+- Mỗi thiết bị remote lưu bearer key riêng trong browser `localStorage`; QR hoặc public URL không mang theo secret đó.
 
 ## Ghi chú vận hành
 
 - Production entrypoint là server Express trong `packages/server`.
 - Frontend static được phục vụ từ `packages/web/out`.
 - Mỗi session ứng dụng sở hữu một `tmux` runtime riêng.
+- API tunnel hiện có thêm `PUT /api/tunnel/auto-start` để bật/tắt named-tunnel auto-start từ UI.

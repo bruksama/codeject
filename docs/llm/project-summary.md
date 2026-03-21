@@ -21,7 +21,7 @@
 
 - User opens the web UI → creates a session → selects a CLI program → server maps that session to a tmux target → web shows chat plus inline action cards for approvals, selects, and generic text prompts.
 - `Claude Code` and `OpenAI Codex` use final-only assistant rendering: keep loading while transcript is still working, then patch one final assistant answer.
-- Optional: server manages a single Cloudflare Tunnel process to expose the local web UI remotely, either as a quick tunnel or a named token-based tunnel.
+- Optional: server manages a single Cloudflare Tunnel process to expose the local web UI remotely, either as a quick tunnel or a named token-based tunnel with optional auto-start.
 
 ## Runtime model
 
@@ -39,6 +39,7 @@
 - Non-local REST requests: require `Authorization: Bearer <key>`.
 - Non-local WebSocket connections: require `?token=<apiKey>` on `/ws/:sessionId`.
 - API key is hashed before being stored; QR codes only contain public URLs.
+- Remote devices may save the bearer key locally in browser storage after opening the public URL.
 
 ## Source-of-truth docs
 

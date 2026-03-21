@@ -47,6 +47,7 @@
 - Supports two modes:
   - `quick`: ephemeral `trycloudflare.com` URL discovered from runtime output
   - `named-token`: fixed hostname derived from saved config, started with a saved tunnel token
+- Named-tunnel mode may also auto-start when persisted config enables it.
 - Exposed via `/api/tunnel` endpoints for status, start, stop, restart, and config update.
 
 ## Data and persistence
@@ -56,6 +57,7 @@
   - `config.json`: auth key and app configuration.
   - `sessions/*.json`: persisted session metadata.
 - Terminal scrollback is kept inside tmux history, not in JSON files.
+- Per-device remote bearer keys are not stored in `~/.codeject`; they live in each browser's local storage.
 
 ## Request / data flows
 
@@ -74,13 +76,14 @@
 
 1. User enables tunnel via `/api/tunnel/start`.
 2. Server starts a `cloudflared` process in either quick or named-token mode.
-3. Tunnel state and public URL are exposed via `/api/tunnel`.
+3. Tunnel state, auto-start flag, and public URL are exposed via `/api/tunnel`.
 4. Non-local REST requests coming through the tunnel must present `Authorization: Bearer <key>`; non-local WebSocket connections use `?token=<key>`.
 
 ## Important constraints
 
 - Host **must** have `tmux` installed.
 - Remote access **requires** `cloudflared` on the host.
+- Tunnel auto-start is intentionally limited to named-token mode.
 - Runtime source of truth is tmux; chat transcript is derived UX state.
 - `Claude Code` and `OpenAI Codex` currently use final-only chat rendering, not visible token-by-token streaming.
 - Local requests bypass auth; non-local REST and WebSocket connections both require the same API key, but transport it differently.

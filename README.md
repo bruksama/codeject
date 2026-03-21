@@ -18,12 +18,17 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Tạo, lưu, khôi phục và xóa nhiều session CLI.
 - Chọn chương trình CLI như Claude Code, Codex hoặc generic shell cho từng session.
 - Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
+- `Settings > Appearance > Font Size` đổi cỡ chữ toàn app ngay lập tức, lưu theo từng trình duyệt, và scale luôn khoảng trống chat/composer để dễ đọc hơn.
+- `Settings > Appearance > Accent Color` đổi màu nhấn toàn app, cũng lưu theo từng trình duyệt.
 - Inline action cards cho confirm, select, và free-text input khi CLI chờ phản hồi.
 - Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
+- Composer gợi ý lệnh ClaudeKit ổn định ngay khi token đầu tiên bắt đầu bằng `/` cho Claude session hoặc `$` cho Codex session.
 - Với `Claude Code` và `OpenAI Codex`, chat giữ loading cho tới khi transcript xác nhận final answer; commentary và tool-progress không render thành bubble assistant.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
 - Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
 - Hỗ trợ quick tunnel mặc định và named tunnel token-based cho domain riêng.
+- Named tunnel có thể bật auto-start khi server khởi động; quick tunnel vẫn giữ manual-only.
+- Mỗi thiết bị remote có thể lưu bearer key riêng trong browser để gọi REST/WebSocket sau khi mở public URL hoặc QR.
 
 ## Demo nhanh
 
@@ -69,11 +74,19 @@ Chi tiết hơn xem `docs/getting-started.md`.
    - Chọn chương trình CLI phù hợp.
    - Lưu session để có thể khôi phục sau.
 3. Gửi prompt qua chat surface và quan sát trả lời.
+   - Với session Claude, bắt đầu token đầu bằng `/` để thấy gợi ý ClaudeKit command ổn định.
+   - Với session Codex, bắt đầu token đầu bằng `$` để thấy cùng bộ gợi ý đó theo prefix của Codex.
+   - Khi chọn gợi ý, composer chỉ thay token đầu và giữ nguyên phần prompt còn lại bạn đã gõ.
 4. Khi CLI cần approval, chọn option, hoặc nhập liệu:
    - Trả lời ngay trong action card được render trong chat.
-5. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
+5. Nếu chat hơi chật hoặc quá lớn trên thiết bị hiện tại:
+   - Vào `Settings > Appearance > Font Size`.
+   - Thay đổi áp dụng ngay cho toàn bộ UI và được nhớ lại trên chính trình duyệt đó.
+6. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
    - Quick tunnel: zero-setup, URL tạm.
    - Named tunnel: URL cố định trên domain Cloudflare của bạn.
+   - Named tunnel có thể bật auto-start sau khi đã lưu hostname + token.
+   - Trên thiết bị remote, dán bearer key vào `Settings > Remote Access > Device Auth` một lần để browser đó tự gửi cho REST/WebSocket.
 
 Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.md`.
 
@@ -81,6 +94,7 @@ Giới hạn hiện tại:
 
 - Opaque arrow-key hoặc full-screen TUI chưa phải chat card thực sự; hỗ trợ tốt nhất hiện tại là prompt text, approval, và numbered select.
 - `Claude Code` va `OpenAI Codex` hiện không stream token-by-token lên chat; phản hồi chỉ hiện khi transcript có final answer an toàn.
+- Gợi ý command chỉ áp dụng cho provider đã hỗ trợ (`Claude Code`, `OpenAI Codex`); provider khác giữ hành vi composer cũ.
 
 ## Kiến trúc và công nghệ
 

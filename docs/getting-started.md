@@ -55,6 +55,17 @@ Trong chế độ này, frontend Next.js và backend Express/WebSocket chạy so
    - Gửi prompt qua **chat surface**.
    - Khi CLI chờ approval, chọn option, hoặc nhập liệu, trả lời ngay trong **action card** của chat.
 
+## Tùy biến giao diện
+
+Trong màn hình `Settings`, phần `Appearance` hiện cho phép:
+
+- đổi `Font Size` giữa các mức nhỏ, vừa, lớn
+- đổi `Accent Color`
+
+`Font Size` áp dụng ngay khi bạn đổi và affect toàn bộ typography của app, gồm cả khoảng trống chat transcript/composer để bề mặt đọc theo đúng scale đã chọn.
+
+Các tùy chọn này được lưu cục bộ trong trình duyệt hiện tại qua browser storage, nên mỗi trình duyệt hoặc thiết bị có thể giữ mức chữ riêng. Nếu cần đưa giao diện về mặc định, vào `Settings` và dùng `Reset All Settings` trong `Danger Zone`.
+
 ## Remote access (tùy chọn)
 
 Nếu host đã cài `cloudflared`, bạn có thể bật remote access để truy cập Codeject từ điện thoại:
@@ -63,11 +74,14 @@ Nếu host đã cài `cloudflared`, bạn có thể bật remote access để tr
   - Chọn `Quick` hoặc `Named`.
   - Bật / tắt / restart Cloudflare Tunnel.
   - Xem public URL và QR code.
+  - Với `Named`, lưu hostname + token và tùy chọn bật `Auto-start` để server tự start tunnel sau mỗi lần boot.
+  - Với thiết bị remote, lưu bearer key vào `Device Auth` để browser đó tự gửi auth cho REST/WebSocket.
 - `Quick` phù hợp khi cần chạy nhanh, không cần domain riêng.
 - `Named` phù hợp khi bạn đã có tunnel token và hostname trên Cloudflare.
 - Lưu ý:
   - Request **không local** bắt buộc phải gửi `Authorization: Bearer <key>`.
   - QR chỉ chứa public URL, **không chứa secret**.
+  - `Auto-start` chỉ áp dụng cho `Named`; quick tunnel vẫn phải start thủ công.
 
 Chi tiết thêm xem trong `docs/deployment-guide.md` và `docs/usage-recipes.md`.
 
