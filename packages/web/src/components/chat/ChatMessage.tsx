@@ -22,7 +22,7 @@ function parseMarkdown(content: string): React.ReactNode[] {
     if (match.index > lastIndex) {
       const textBefore = content.slice(lastIndex, match.index);
       segments.push(
-        <div key={`text-${segIdx++}`} className="markdown-content text-sm leading-relaxed">
+        <div key={`text-${segIdx++}`} className="markdown-content text-[0.95rem] leading-7">
           {renderInlineMarkdown(textBefore)}
         </div>
       );
@@ -37,7 +37,7 @@ function parseMarkdown(content: string): React.ReactNode[] {
   // Remaining text
   if (lastIndex < content.length) {
     segments.push(
-      <div key={`text-${segIdx++}`} className="markdown-content text-sm leading-relaxed">
+      <div key={`text-${segIdx++}`} className="markdown-content text-[0.95rem] leading-7">
         {renderInlineMarkdown(content.slice(lastIndex))}
       </div>
     );
@@ -141,7 +141,7 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
 
   return (
     <div
-      className={`flex gap-3 mb-4 fade-in ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`content-auto-message mb-5 flex gap-3 fade-in ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
       onContextMenu={(e) => {
         e.preventDefault();
         setShowTimestamp(!showTimestamp);
@@ -150,7 +150,7 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
       {/* Avatar */}
       {!isUser && (
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 self-end mb-1"
+          className="mb-1 flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-full text-base"
           style={{
             background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
             border: '1px solid color-mix(in srgb, var(--accent-primary) 26%, transparent)',
@@ -169,7 +169,7 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
           style={{ wordBreak: 'break-word' }}
         >
           {isUser ? (
-            <p className="text-sm leading-relaxed">{message.content}</p>
+            <p className="text-[0.95rem] leading-7">{message.content}</p>
           ) : (
             <div className="space-y-1">{parseMarkdown(message.content)}</div>
           )}

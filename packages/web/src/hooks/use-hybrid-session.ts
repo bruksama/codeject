@@ -56,6 +56,7 @@ export function useHybridSession(sessionId: string | undefined) {
     if (!sessionId) return;
     setState((current) => ({
       ...current,
+      lastError: status === 'connected' || status === 'idle' ? null : current.lastError,
       status,
       submittingActionId: status === 'connected' ? current.submittingActionId : null,
     }));
@@ -65,7 +66,7 @@ export function useHybridSession(sessionId: string | undefined) {
   useEffect(() => {
     if (!sessionId) return;
 
-    const client = new WebSocketClient(getWebSocketUrl(sessionId), {
+    const client = new WebSocketClient(() => getWebSocketUrl(sessionId), {
       onError: (message) => {
         setState((current) => ({
           ...current,

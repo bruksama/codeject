@@ -3,16 +3,14 @@ import '@/styles/tailwind.css';
 import { Toaster } from 'sonner';
 import AccentThemeSync from '@/components/ui/accent-theme-sync';
 import FontSizeThemeSync from '@/components/ui/font-size-theme-sync';
+import SkipToContentLink from '@/components/ui/skip-to-content-link';
+import { defaultFontSizeConfig, fontSizeScale } from '@/lib/font-size-scale';
 
 const FONT_SIZE_INIT_SCRIPT = `
 (() => {
   const root = document.documentElement;
-  const fallback = { size: '16px', scale: '1' };
-  const scaleMap = {
-    small: { size: '15px', scale: '0.9375' },
-    medium: fallback,
-    large: { size: '17px', scale: '1.0625' }
-  };
+  const fallback = ${JSON.stringify(defaultFontSizeConfig)};
+  const scaleMap = ${JSON.stringify(fontSizeScale)};
 
   try {
     const raw = window.localStorage.getItem('codeject-storage');
@@ -43,8 +41,6 @@ export const viewport: Viewport = {
   themeColor: '#08080f',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
 };
 
@@ -60,7 +56,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ background: '#08080f' }}>
         <AccentThemeSync />
         <FontSizeThemeSync />
-        {children}
+        <SkipToContentLink />
+        <div>{children}</div>
         <Toaster
           position="bottom-center"
           toastOptions={{

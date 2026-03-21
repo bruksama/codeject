@@ -16,7 +16,8 @@ export default function FloatingActionButton({
     <button
       onClick={onClick}
       aria-label={label}
-      className="fixed z-40 accent-gradient accent-glow fab-pulse rounded-full shadow-2xl active:scale-90 transition-transform duration-150"
+      className="interactive-focus-ring mobile-touch-target fixed z-40 accent-gradient accent-glow fab-pulse rounded-full shadow-2xl active:scale-90 transition-transform duration-150"
+      type="button"
       style={{
         bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
         right: '20px',
@@ -27,6 +28,7 @@ export default function FloatingActionButton({
       <span className="flex items-center justify-center w-full h-full">
         <Plus size={26} className="text-white" strokeWidth={2.5} />
       </span>
+      <span className="sr-only">{label}</span>
     </button>
   );
 }

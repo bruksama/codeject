@@ -31,7 +31,7 @@ const AppImage = memo(function AppImage({
   height,
   className = '',
   priority = false,
-  quality = 85,
+  quality = 75,
   placeholder = 'empty',
   blurDataURL,
   fill = false,
@@ -75,13 +75,16 @@ const AppImage = memo(function AppImage({
   const imageProps = useMemo(() => {
     const baseProps: Partial<ImageProps> = {
       className: imageClassName,
-      quality,
       placeholder,
       unoptimized: resolvedUnoptimized,
       onError: handleError,
       onLoad: handleLoad,
       onClick,
     };
+
+    if (!resolvedUnoptimized) {
+      baseProps.quality = quality;
+    }
 
     if (priority) {
       baseProps.priority = true;

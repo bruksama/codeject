@@ -110,8 +110,10 @@ export function ChatComposer({
         }}
       >
         <textarea
+          aria-label="Message your CLI session"
+          aria-invalid={Boolean(errorMessage)}
           ref={textareaRef}
-          className="auto-grow-textarea w-full flex-1 bg-transparent px-1.5 py-1 text-sm leading-6 text-white/90 placeholder:text-white/25 focus:outline-none"
+          className="auto-grow-textarea w-full flex-1 bg-transparent px-1.5 py-1 text-[0.95rem] leading-6 text-white/92 placeholder:text-white/25 focus:outline-none"
           disabled={disabled}
           onBlur={() => setIsFocused(false)}
           onChange={(event) => handleValueChange(event.target.value)}
@@ -168,7 +170,8 @@ export function ChatComposer({
           value={value}
         />
         <button
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white transition-all duration-200 active:scale-[0.98] ${
+          aria-label={canInterrupt ? 'Interrupt prompt' : 'Send message'}
+          className={`interactive-focus-ring mobile-touch-target flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white transition-all duration-200 active:scale-[0.98] ${
             canInterrupt || canSubmit ? 'opacity-100' : 'pointer-events-none opacity-45'
           } ${isExpanded ? 'h-11 w-11' : ''}`}
           onClick={canInterrupt ? onInterrupt : onSubmit}
@@ -192,7 +195,9 @@ export function ChatComposer({
           )}
         </button>
       </div>
-      {errorMessage ? <p className="px-1 pt-2 text-xs text-red-400/85">{errorMessage}</p> : null}
+      <div className="field-support-text px-1 pt-2">
+        {errorMessage ? <p className="text-xs text-red-400/85">{errorMessage}</p> : null}
+      </div>
     </div>
   );
 }

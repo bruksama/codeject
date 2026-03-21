@@ -153,6 +153,7 @@ export function ChatTranscript({
       <div
         ref={scrollContainerRef}
         className="flex h-full flex-col gap-4 overflow-y-auto px-1 pt-1"
+        id="chat-transcript"
         style={{
           paddingBottom: `calc(${composerClearance} + env(safe-area-inset-bottom, 0px))`,
         }}
@@ -183,7 +184,8 @@ export function ChatTranscript({
       </div>
       {showJumpToLatest ? (
         <button
-          className="absolute left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
+          aria-label="Jump to latest message"
+          className="interactive-focus-ring mobile-touch-target absolute left-1/2 isolate flex h-11 min-w-11 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full px-3 text-white/95 shadow-[0_16px_36px_rgba(0,0,0,0.38)]"
           onClick={() => scrollToLatest('smooth')}
           style={{
             bottom: `calc(${composerClearance} + ${JUMP_TO_LATEST_OFFSET} + env(safe-area-inset-bottom, 0px))`,

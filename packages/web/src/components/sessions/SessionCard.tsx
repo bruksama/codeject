@@ -7,6 +7,7 @@ import ProgramIcon from '@/components/ui/program-icon';
 import { Session } from '@/types';
 import ConnectionBadge from '@/components/ui/ConnectionBadge';
 import { useAppStore } from '@/stores/useAppStore';
+import { selectSetActiveSession } from '@/stores/use-app-store-selectors';
 
 interface SessionCardProps {
   session: Session;
@@ -49,7 +50,7 @@ function getSessionPreview(session: Session): string {
 
 export default function SessionCard({ session, onDelete }: SessionCardProps) {
   const router = useRouter();
-  const setActiveSession = useAppStore((s) => s.setActiveSession);
+  const setActiveSession = useAppStore(selectSetActiveSession);
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -114,14 +115,14 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
 
   return (
     <div
-      className={`swipe-card-container mb-3 transition-all duration-350 ${
+      className={`swipe-card-container content-auto-card mb-3 transition-all duration-350 ${
         isDeleting ? 'opacity-0 max-h-0 mb-0 overflow-hidden' : 'opacity-100 max-h-[200px]'
       }`}
       style={{ transition: isDeleting ? 'all 0.35s ease' : undefined }}
     >
       {/* Delete background */}
       <button
-        className="absolute inset-0 delete-reveal flex items-center justify-end rounded-2xl pr-5"
+        className="absolute inset-0 delete-reveal interactive-focus-ring flex items-center justify-end rounded-2xl pr-5"
         aria-label={`Delete session ${session.name}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -143,7 +144,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
 
       {/* Card */}
       <div
-        className="glass-card rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform duration-100"
+        className="glass-card interactive-focus-ring rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform duration-100"
         style={{
           transform: `translateX(-${swipeX}px)`,
           transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
@@ -156,13 +157,16 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
         tabIndex={0}
         aria-label={`Open session ${session.name}`}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') handleOpen();
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleOpen();
+          }
         }}
       >
         <div className="flex items-start gap-3">
           {/* Program icon */}
           <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl"
             style={{
               background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
               border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
@@ -176,22 +180,22 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
             <div className="flex items-center justify-between gap-2 mb-0.5">
               <span className="text-sm font-semibold text-white/90 truncate">{session.name}</span>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <ConnectionBadge status={session.status} />
-                <span className="text-[0.6875rem] text-white/30">{relativeTime}</span>
+                <ConnectionBadge showLabel size="sm" status={session.status} />
+                <span className="text-[0.6875rem] text-white/45">{relativeTime}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="accent-text truncate text-[0.6875rem] font-medium opacity-80">
+              <span className="accent-text truncate text-[0.6875rem] font-medium opacity-90">
                 {session.cliProgram.name}
               </span>
               <span className="text-white/20 text-[0.625rem]">•</span>
-              <span className="text-[0.6875rem] text-white/35 truncate font-mono">
+              <span className="text-[0.6875rem] text-white/45 truncate font-mono">
                 {session.workspacePath}
               </span>
             </div>
 
-            <p className="text-xs text-white/40 leading-relaxed line-clamp-2">{preview}</p>
+            <p className="text-sm text-white/55 leading-6 line-clamp-2">{preview}</p>
           </div>
         </div>
       </div>

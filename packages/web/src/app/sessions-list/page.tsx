@@ -1,27 +1,29 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Zap, X } from 'lucide-react';
+import { RefreshCcw, Search, X, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import InlineAlertBanner from '@/components/ui/inline-alert-banner';
 import AppLogo from '@/components/ui/AppLogo';
 import BottomTabBar from '@/components/ui/BottomTabBar';
 import FloatingActionButton from '@/components/ui/FloatingActionButton';
+import MobileActionButton from '@/components/ui/mobile-action-button';
 import SessionCard from '@/components/sessions/SessionCard';
 import { useSessionApi } from '@/hooks/use-session-api';
 import { useAppStore } from '@/stores/useAppStore';
-import { Session } from '@/types';
+import { selectSessions } from '@/stores/use-app-store-selectors';
+import type { Session } from '@/types';
 
-// Skeleton card for loading state
 function SessionCardSkeleton() {
   return (
-    <div className="glass-card rounded-2xl p-4 mb-3">
+    <div className="glass-card mb-3 rounded-2xl p-4">
       <div className="flex items-start gap-3">
-        <div className="skeleton w-11 h-11 rounded-xl flex-shrink-0" />
+        <div className="skeleton h-11 w-11 rounded-xl shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <div className="skeleton h-4 w-32 rounded-md" />
-            <div className="skeleton h-3 w-16 rounded-md" />
+            <div className="skeleton h-3 w-20 rounded-md" />
           </div>
           <div className="skeleton h-3 w-24 rounded-md" />
           <div className="skeleton h-3 w-full rounded-md" />
@@ -32,109 +34,190 @@ function SessionCardSkeleton() {
   );
 }
 
-// Empty state
 function EmptyState({ hasSearch }: { hasSearch: boolean }) {
   const router = useRouter();
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-8 text-center fade-in">
+    <div className="fade-in flex flex-col items-center justify-center px-8 py-20 text-center">
       <div
-        className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mb-5"
+        className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl text-4xl"
         style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)' }}
       >
         {hasSearch ? '🔍' : '💬'}
       </div>
-      <h3 className="text-lg font-semibold text-white/80 mb-2">
+      <h2 className="text-base font-semibold text-white/86">
         {hasSearch ? 'No sessions found' : 'No sessions yet'}
-      </h3>
-      <p className="text-sm text-white/40 leading-relaxed mb-6">
+      </h2>
+      <p className="mt-2 max-w-sm text-base leading-7 text-white/45">
         {hasSearch
-          ? 'Try a different search term or clear the filter.'
-          : 'Start a new session to connect to Claude Code, Codex, or any CLI coding assistant.'}
+          ? 'Try a different search term or clear the current filter.'
+          : 'Start a session for Claude Code, Codex, or another CLI assistant and it will appear here.'}
       </p>
-      {!hasSearch && (
+      {!hasSearch ? (
         <button
+          className="interactive-focus-ring accent-gradient accent-glow-sm mt-6 rounded-2xl px-6 py-3.5 text-sm font-semibold text-white transition-transform duration-150 active:scale-[0.98]"
           onClick={() => router.push('/new-session-setup')}
-          className="accent-gradient px-6 py-3 rounded-2xl text-sm font-semibold text-white active:scale-95 transition-transform duration-150 accent-glow-sm"
+          type="button"
         >
           Create First Session
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
 
-// Status summary bar
-function StatusSummary({ sessions }: { sessions: Session[] }) {
-  const connected = sessions.filter((s) => s.status === 'connected').length;
-  const idle = sessions.filter((s) => s.status === 'idle').length;
-  const errors = sessions.filter((s) => s.status === 'error').length;
+function buildSessionGroups(sessions: Session[]) {
+  return sessions.reduce(
+    (groups, session) => {
+      if (
+        session.status === 'connected' ||
+        session.status === 'connecting' ||
+        session.status === 'starting'
+      ) {
+        groups.active.push(session);
+      } else if (session.status === 'idle') {
+        groups.idle.push(session);
+      } else if (session.status === 'error') {
+        groups.error.push(session);
+      } else {
+        groups.disconnected.push(session);
+      }
 
-  if (sessions.length === 0) return null;
+      return groups;
+    },
+    {
+      active: [] as Session[],
+      disconnected: [] as Session[],
+      error: [] as Session[],
+      idle: [] as Session[],
+    }
+  );
+}
+
+function StatusSummary({
+  groupedSessions,
+}: {
+  groupedSessions: ReturnType<typeof buildSessionGroups>;
+}) {
+  const totalSessions =
+    groupedSessions.active.length +
+    groupedSessions.idle.length +
+    groupedSessions.error.length +
+    groupedSessions.disconnected.length;
+
+  if (totalSessions === 0) {
+    return null;
+  }
 
   return (
     <div
-      className="flex items-center gap-3 px-4 py-2.5 mb-2"
+      className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3"
       style={{
         background: 'rgba(255,255,255,0.02)',
-        borderRadius: 12,
         border: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      {connected > 0 && (
+      {groupedSessions.active.length > 0 ? (
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-400 status-pulse" />
-          <span className="text-xs text-green-400 font-medium">{connected} live</span>
+          <span className="status-pulse h-2 w-2 rounded-full bg-green-400" />
+          <span className="text-xs font-medium text-green-300">
+            {groupedSessions.active.length} active
+          </span>
         </div>
-      )}
-      {idle > 0 && (
+      ) : null}
+      {groupedSessions.idle.length > 0 ? (
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-400" />
-          <span className="text-xs text-blue-400 font-medium">{idle} idle</span>
+          <span className="h-2 w-2 rounded-full bg-blue-400" />
+          <span className="text-xs font-medium text-blue-300">
+            {groupedSessions.idle.length} idle
+          </span>
         </div>
-      )}
-      {errors > 0 && (
+      ) : null}
+      {groupedSessions.error.length > 0 ? (
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-red-400 status-pulse" />
-          <span className="text-xs text-red-400 font-medium">{errors} error</span>
+          <span className="status-pulse h-2 w-2 rounded-full bg-red-400" />
+          <span className="text-xs font-medium text-red-300">
+            {groupedSessions.error.length} needs attention
+          </span>
         </div>
-      )}
-      <div className="ml-auto flex items-center gap-1">
-        <Zap size={11} className="text-purple-400/60" />
-        <span className="text-[0.625rem] text-white/30">{sessions.length} sessions</span>
+      ) : null}
+      <div className="ml-auto flex items-center gap-1.5 text-white/35">
+        <Zap className="text-white/35" size={12} />
+        <span className="text-[0.6875rem]">{totalSessions} sessions</span>
       </div>
     </div>
+  );
+}
+
+function SessionSection({
+  label,
+  onDelete,
+  sessions,
+  toneClassName,
+}: {
+  label: string;
+  onDelete: (id: string) => void;
+  sessions: Session[];
+  toneClassName: string;
+}) {
+  if (sessions.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="mb-2">
+      <h2
+        className={`mb-2 px-1 text-[0.6875rem] font-semibold uppercase tracking-[0.22em] ${toneClassName}`}
+      >
+        {label}
+      </h2>
+      {sessions.map((session) => (
+        <SessionCard key={session.id} onDelete={onDelete} session={session} />
+      ))}
+    </section>
   );
 }
 
 export default function SessionsListPage() {
   const router = useRouter();
   const sessionApi = useSessionApi();
-  const { sessions } = useAppStore();
+  const sessions = useAppStore(selectSessions);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const deferredSearchQuery = useDeferredValue(searchQuery.trim().toLowerCase());
 
-  React.useEffect(() => {
+  useEffect(() => {
     void (async () => {
       try {
         await sessionApi.loadSessions();
+        setLoadError(null);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to load sessions');
+        const message = error instanceof Error ? error.message : 'Failed to load sessions';
+        setLoadError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
     })();
   }, [sessionApi]);
 
-  const filteredSessions = sessions.filter((s) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      s.name.toLowerCase().includes(q) ||
-      s.cliProgram.name.toLowerCase().includes(q) ||
-      s.workspacePath.toLowerCase().includes(q)
-    );
-  });
+  const filteredSessions = useMemo(() => {
+    if (!deferredSearchQuery) {
+      return sessions;
+    }
+
+    return sessions.filter((session) => {
+      return (
+        session.name.toLowerCase().includes(deferredSearchQuery) ||
+        session.cliProgram.name.toLowerCase().includes(deferredSearchQuery) ||
+        session.workspacePath.toLowerCase().includes(deferredSearchQuery)
+      );
+    });
+  }, [deferredSearchQuery, sessions]);
+
+  const groupedSessions = useMemo(() => buildSessionGroups(filteredSessions), [filteredSessions]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -152,9 +235,12 @@ export default function SessionsListPage() {
     setIsRefreshing(true);
     try {
       await sessionApi.loadSessions();
+      setLoadError(null);
       toast.success('Sessions refreshed');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to refresh sessions');
+      const message = error instanceof Error ? error.message : 'Failed to refresh sessions';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setIsRefreshing(false);
     }
@@ -162,158 +248,126 @@ export default function SessionsListPage() {
 
   return (
     <div
-      className="min-h-dvh flex flex-col"
-      style={{ background: '#08080f', paddingTop: 'env(safe-area-inset-top, 44px)' }}
+      className="flex min-h-dvh flex-col bg-[#08080f]"
+      style={{ paddingTop: 'env(safe-area-inset-top, 44px)' }}
     >
-      {/* Header */}
-      <header className="px-4 pt-3 pb-2">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <AppLogo size={32} />
+      <header className="px-4 pb-3 pt-3">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <AppLogo size={34} />
             <div>
-              <span className="text-lg font-bold tracking-tight accent-gradient-text">
-                Codeject
-              </span>
-              <p className="text-[0.625rem] text-white/30 -mt-0.5">CLI Assistant Bridge</p>
+              <h1 className="text-lg font-bold tracking-tight text-white/92">Codeject</h1>
+              <p className="text-sm leading-6 text-white/45">
+                Sessions, activity, and quick recovery.
+              </p>
             </div>
           </div>
-          <button
-            onClick={handleRefresh}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 ${
-              isRefreshing
-                ? 'bg-purple-500/20 animate-spin'
-                : 'bg-white/5 hover:bg-white/10 active:scale-90'
-            }`}
-            aria-label="Refresh sessions"
+          <MobileActionButton
             disabled={isRefreshing}
+            label="Refresh sessions"
+            onClick={() => void handleRefresh()}
+            size="sm"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-white/50"
-            >
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-              <path d="M8 16H3v5" />
-            </svg>
-          </button>
+            <RefreshCcw className={isRefreshing ? 'animate-spin' : ''} size={16} />
+            <span className="ml-2 text-xs font-semibold">
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </span>
+          </MobileActionButton>
         </div>
 
-        {/* Search bar */}
         <div className="relative">
           <Search
-            size={15}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/35"
+            size={16}
           />
           <input
+            aria-label="Search sessions"
+            className="input-focus w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3 pl-11 pr-12 text-base text-white/86 placeholder:text-white/28"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search sessions, programs, or paths"
             type="search"
-            placeholder="Search sessions, programs, paths…"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-9 py-2.5 rounded-xl text-sm text-white/80 placeholder-white/25 input-focus transition-all duration-200"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.09)',
-            }}
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/15 flex items-center justify-center"
               aria-label="Clear search"
+              className="interactive-focus-ring mobile-touch-target absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10"
+              onClick={() => setSearchQuery('')}
+              type="button"
             >
-              <X size={11} className="text-white/60" />
+              <X className="text-white/65" size={14} />
             </button>
-          )}
+          ) : null}
         </div>
       </header>
 
-      {/* Content */}
       <main
-        className="flex-1 overflow-y-auto px-4 pt-3"
-        style={{ paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' }}
+        className="flex-1 overflow-y-auto px-4 pt-2"
+        id="main-content"
+        tabIndex={-1}
+        style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}
       >
+        {loadError ? (
+          <div className="mb-3">
+            <InlineAlertBanner
+              actions={
+                <MobileActionButton
+                  label="Retry loading sessions"
+                  onClick={() => void handleRefresh()}
+                  size="sm"
+                  variant="accent"
+                >
+                  <RefreshCcw size={15} />
+                  <span className="ml-2 text-xs font-semibold">Retry</span>
+                </MobileActionButton>
+              }
+              message={loadError}
+              title="Session list needs attention"
+              tone="warning"
+            />
+          </div>
+        ) : null}
+
         {isLoading ? (
           <div>
-            {[1, 2, 3, 4].map((i) => (
-              <SessionCardSkeleton key={i} />
+            {[1, 2, 3, 4].map((item) => (
+              <SessionCardSkeleton key={item} />
             ))}
           </div>
         ) : filteredSessions.length === 0 ? (
-          <EmptyState hasSearch={!!searchQuery.trim()} />
+          <EmptyState hasSearch={Boolean(searchQuery.trim())} />
         ) : (
           <>
-            <StatusSummary sessions={filteredSessions} />
-
-            {/* Sessions grouped by status */}
-            {/* Connected first */}
-            {filteredSessions.filter((s) => s.status === 'connected').length > 0 && (
-              <div className="mb-1">
-                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-green-400/50 mb-2 px-1">
-                  Active
-                </p>
-                {filteredSessions
-                  .filter((s) => s.status === 'connected')
-                  .map((session) => (
-                    <SessionCard key={session.id} session={session} onDelete={handleDelete} />
-                  ))}
-              </div>
-            )}
-
-            {/* Idle */}
-            {filteredSessions.filter((s) => s.status === 'idle').length > 0 && (
-              <div className="mb-1">
-                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-blue-400/50 mb-2 px-1">
-                  Idle
-                </p>
-                {filteredSessions
-                  .filter((s) => s.status === 'idle')
-                  .map((session) => (
-                    <SessionCard key={session.id} session={session} onDelete={handleDelete} />
-                  ))}
-              </div>
-            )}
-
-            {/* Errors */}
-            {filteredSessions.filter((s) => s.status === 'error').length > 0 && (
-              <div className="mb-1">
-                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-red-400/50 mb-2 px-1">
-                  Needs Attention
-                </p>
-                {filteredSessions
-                  .filter((s) => s.status === 'error')
-                  .map((session) => (
-                    <SessionCard key={session.id} session={session} onDelete={handleDelete} />
-                  ))}
-              </div>
-            )}
-
-            {/* Disconnected */}
-            {filteredSessions.filter((s) => s.status === 'disconnected').length > 0 && (
-              <div className="mb-1">
-                <p className="text-[0.625rem] font-semibold uppercase tracking-widest text-white/20 mb-2 px-1">
-                  Disconnected
-                </p>
-                {filteredSessions
-                  .filter((s) => s.status === 'disconnected')
-                  .map((session) => (
-                    <SessionCard key={session.id} session={session} onDelete={handleDelete} />
-                  ))}
-              </div>
-            )}
+            <StatusSummary groupedSessions={groupedSessions} />
+            <SessionSection
+              label="Active"
+              onDelete={handleDelete}
+              sessions={groupedSessions.active}
+              toneClassName="text-green-300/65"
+            />
+            <SessionSection
+              label="Needs Attention"
+              onDelete={handleDelete}
+              sessions={groupedSessions.error}
+              toneClassName="text-red-300/65"
+            />
+            <SessionSection
+              label="Idle"
+              onDelete={handleDelete}
+              sessions={groupedSessions.idle}
+              toneClassName="text-blue-300/65"
+            />
+            <SessionSection
+              label="Disconnected"
+              onDelete={handleDelete}
+              sessions={groupedSessions.disconnected}
+              toneClassName="text-white/35"
+            />
           </>
         )}
       </main>
 
-      {/* FAB */}
       <FloatingActionButton onClick={() => router.push('/new-session-setup')} />
-
-      {/* Bottom tab bar */}
       <BottomTabBar />
     </div>
   );

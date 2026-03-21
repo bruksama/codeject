@@ -10,6 +10,32 @@ import {
 } from '@/types';
 
 const API_KEY_STORAGE_KEY = 'codeject-api-key';
+let cachedApiKey: string | null = null;
+let storageListenersAttached = false;
+
+function ensureApiKeyStorageListeners() {
+  if (storageListenersAttached || typeof window === 'undefined') {
+    return;
+  }
+
+  const clearCache = () => {
+    cachedApiKey = null;
+  };
+
+  window.addEventListener('storage', (event) => {
+    if (!event.key || event.key === API_KEY_STORAGE_KEY) {
+      clearCache();
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      clearCache();
+    }
+  });
+
+  storageListenersAttached = true;
+}
 
 export interface TunnelStatusResponse {
   authConfigured: boolean;
@@ -75,17 +101,24 @@ export function getWebSocketUrl(sessionId: string) {
 
 export function getStoredApiKey() {
   if (typeof window === 'undefined') return '';
-  return window.localStorage.getItem(API_KEY_STORAGE_KEY) ?? '';
+  ensureApiKeyStorageListeners();
+  if (cachedApiKey !== null) {
+    return cachedApiKey;
+  }
+  cachedApiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY) ?? '';
+  return cachedApiKey;
 }
 
 export function setStoredApiKey(apiKey: string) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+  cachedApiKey = apiKey;
 }
 
 export function clearStoredApiKey() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(API_KEY_STORAGE_KEY);
+  cachedApiKey = '';
 }
 
 function normalizeMessage(message: Message): Message {

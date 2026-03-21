@@ -30,20 +30,22 @@ export default function BottomTabBar() {
     >
       <div className="flex items-center justify-around px-4 pt-2">
         {tabs?.map((tab) => {
-          const isActive = normalizedPathname === tab?.path;
+          const isActive =
+            normalizedPathname === tab?.path || normalizedPathname.startsWith(`${tab.path}/`);
           const Icon = tab?.icon;
           return (
             <button
               key={tab?.path}
               onClick={() => router?.push(tab?.path)}
-              className={`flex flex-col items-center gap-1 px-6 py-1 rounded-xl transition-all duration-200 ${
-                isActive ? 'scale-100 opacity-100' : 'scale-95 opacity-55'
+              className={`interactive-focus-ring mobile-touch-target flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-4 py-2 transition-all duration-200 ${
+                isActive ? 'scale-100 opacity-100' : 'scale-[0.98] opacity-60'
               }`}
+              type="button"
               aria-label={tab?.label}
               aria-current={isActive ? 'page' : undefined}
             >
               <div
-                className={`relative p-1.5 rounded-xl transition-all duration-200 ${
+                className={`relative rounded-xl p-2 transition-all duration-200 ${
                   isActive ? 'accent-chip border' : ''
                 }`}
               >
@@ -64,7 +66,7 @@ export default function BottomTabBar() {
                 )}
               </div>
               <span
-                className={`text-[0.625rem] font-medium tracking-wide transition-colors duration-200 ${
+                className={`text-[0.6875rem] font-medium tracking-wide transition-colors duration-200 ${
                   isActive ? 'accent-text' : 'text-gray-500'
                 }`}
               >

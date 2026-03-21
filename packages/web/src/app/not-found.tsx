@@ -18,7 +18,11 @@ export default function NotFound() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+    <main
+      className="flex min-h-screen flex-col items-center justify-center bg-background p-4"
+      id="main-content"
+      tabIndex={-1}
+    >
       <div className="text-center max-w-md">
         <div className="flex justify-center mb-6">
           <div className="relative">
@@ -49,6 +53,6 @@ export default function NotFound() {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

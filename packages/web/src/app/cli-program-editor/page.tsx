@@ -1,19 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import { Suspense, useEffect, useId, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
-import { X, Terminal, Folder, AlertCircle, Trash2, Check } from 'lucide-react';
+import { AlertCircle, Check, Folder, Terminal, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import InlineAlertBanner from '@/components/ui/inline-alert-banner';
+import MobileActionButton from '@/components/ui/mobile-action-button';
+import { MobileScreenHeader } from '@/components/ui/mobile-screen-header';
 import ProgramIcon from '@/components/ui/program-icon';
 import { useSessionApi } from '@/hooks/use-session-api';
+import { useModalDialog } from '@/hooks/use-modal-dialog';
 import { useAppStore } from '@/stores/useAppStore';
+import { selectCliPrograms, selectSessions } from '@/stores/use-app-store-selectors';
 
 interface CliProgramFormData {
-  name: string;
   command: string;
-  icon: string;
   defaultWorkingDir: string;
+  icon: string;
+  name: string;
 }
 
 const PRESET_ICONS = [
@@ -41,29 +46,29 @@ const PRESET_ICONS = [
   '🔩',
   '💎',
   '🏗️',
-];
+] as const;
 
 function EmojiPicker({
-  selected,
   onSelect,
+  selected,
 }: {
-  selected: string;
   onSelect: (emoji: string) => void;
+  selected: string;
 }) {
   return (
-    <div className="grid grid-cols-8 gap-2 p-1">
+    <div className="grid grid-cols-6 gap-2 p-3 sm:grid-cols-8">
       {PRESET_ICONS.map((emoji) => (
         <button
           key={emoji}
-          type="button"
-          onClick={() => onSelect(emoji)}
-          className={`emoji-option w-10 h-10 rounded-xl flex items-center justify-center text-xl ${
-            selected === emoji
-              ? 'bg-purple-500/25 border border-purple-500/50'
-              : 'bg-white/4 border border-white/8 hover:bg-white/10'
-          }`}
           aria-label={`Select ${emoji} icon`}
           aria-pressed={selected === emoji}
+          className={`emoji-option interactive-focus-ring mobile-touch-target flex h-11 w-11 items-center justify-center rounded-xl text-xl ${
+            selected === emoji
+              ? 'border border-purple-500/50 bg-purple-500/25'
+              : 'border border-white/8 bg-white/4 hover:bg-white/10'
+          }`}
+          onClick={() => onSelect(emoji)}
+          type="button"
         >
           {emoji}
         </button>
@@ -72,50 +77,67 @@ function EmojiPicker({
   );
 }
 
-// Delete confirm modal
 function DeleteConfirmModal({
-  programName,
-  onConfirm,
   onCancel,
+  onConfirm,
+  programName,
 }: {
-  programName: string;
-  onConfirm: () => void;
   onCancel: () => void;
+  onConfirm: () => void;
+  programName: string;
 }) {
+  const titleId = useId();
+  const messageId = useId();
+  const { dialogRef, initialFocusRef } = useModalDialog<HTMLButtonElement>({ onClose: onCancel });
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center pb-6 px-4 fade-in"
+      className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-6 fade-in"
+      onClick={onCancel}
+      role="presentation"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
     >
       <div
-        className="w-full rounded-3xl overflow-hidden scale-in"
+        aria-describedby={messageId}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="w-full overflow-hidden rounded-3xl scale-in"
+        onClick={(event) => event.stopPropagation()}
+        ref={dialogRef}
+        role="dialog"
         style={{ background: 'rgba(15,15,26,0.98)', border: '1px solid rgba(255,255,255,0.12)' }}
+        tabIndex={-1}
       >
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+        <div className="px-5 pb-4 pt-5">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15">
               <Trash2 size={18} className="text-red-400" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white/90">Delete Program</h3>
-              <p className="text-xs text-white/40 mt-0.5">This action cannot be undone</p>
+              <h2 className="text-base font-semibold text-white/92" id={titleId}>
+                Delete Program
+              </h2>
+              <p className="mt-0.5 text-xs text-white/42">This action cannot be undone.</p>
             </div>
           </div>
-          <p className="text-sm text-white/55 leading-relaxed">
-            Remove <span className="text-white/80 font-medium">{programName}</span> from your CLI
-            programs list? Existing sessions using this program will still be accessible.
+          <p className="text-sm leading-6 text-white/55" id={messageId}>
+            Remove <span className="font-medium text-white/82">{programName}</span> from the CLI
+            program list? Existing sessions using it remain accessible.
           </p>
         </div>
-        <div className="border-t border-white/8 flex">
+        <div className="flex border-t border-white/8">
           <button
+            className="interactive-focus-ring flex-1 border-r border-white/8 py-4 text-sm font-medium text-white/65"
             onClick={onCancel}
-            className="flex-1 py-4 text-sm font-medium text-white/60 hover:bg-white/5 active:bg-white/10 transition-colors border-r border-white/8"
+            ref={initialFocusRef}
+            type="button"
           >
             Cancel
           </button>
           <button
+            className="interactive-focus-ring flex-1 py-4 text-sm font-semibold text-red-400"
             onClick={onConfirm}
-            className="flex-1 py-4 text-sm font-semibold text-red-400 active:opacity-70 transition-opacity"
+            type="button"
           >
             Delete Program
           </button>
@@ -125,29 +147,38 @@ function DeleteConfirmModal({
   );
 }
 
-// Field wrapper component
 function FormField({
-  label,
-  sublabel,
-  error,
   children,
+  description,
+  error,
+  htmlFor,
+  label,
 }: {
-  label: string;
-  sublabel?: string;
-  error?: string;
   children: React.ReactNode;
+  description?: string;
+  error?: string;
+  htmlFor: string;
+  label: string;
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-white/70 mb-1.5">{label}</label>
-      {sublabel && <p className="text-xs text-white/35 mb-2">{sublabel}</p>}
+      <label className="mb-1.5 block text-sm font-medium text-white/72" htmlFor={htmlFor}>
+        {label}
+      </label>
+      {description ? <p className="mb-2 text-xs leading-5 text-white/42">{description}</p> : null}
       {children}
-      {error && (
-        <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1.5">
-          <AlertCircle size={12} />
-          {error}
-        </p>
-      )}
+      <div className="field-support-text mt-1.5">
+        {error ? (
+          <p
+            className="flex items-center gap-1.5 text-xs text-red-400"
+            id={`${htmlFor}-message`}
+            role="alert"
+          >
+            <AlertCircle size={12} />
+            {error}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -157,7 +188,7 @@ export default function CliProgramEditorPage() {
     <Suspense
       fallback={
         <div
-          className="min-h-dvh flex items-center justify-center"
+          className="flex min-h-dvh items-center justify-center"
           style={{ background: '#08080f' }}
         />
       }
@@ -172,43 +203,47 @@ function CliProgramEditorContent() {
   const searchParams = useSearchParams();
   const programId = searchParams.get('id');
   const sessionApi = useSessionApi();
-
-  const { cliPrograms, sessions } = useAppStore();
-
-  const isEditing = !!programId;
-  const existingProgram = cliPrograms.find((p) => p.id === programId);
-
+  const cliPrograms = useAppStore(selectCliPrograms);
+  const sessions = useAppStore(selectSessions);
+  const existingProgram = cliPrograms.find((program) => program.id === programId);
+  const isEditing = Boolean(programId);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedIcon, setSelectedIcon] = useState(
-    existingProgram?.icon || '/assets/program-icons/claude.png'
-  );
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const {
-    register,
-    handleSubmit,
-    setValue,
     control,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isDirty, isSubmitting },
+    handleSubmit,
+    reset,
+    register,
+    setValue,
   } = useForm<CliProgramFormData>({
     defaultValues: {
-      name: existingProgram?.name || '',
       command: existingProgram?.command || '',
-      icon: existingProgram?.icon || '/assets/program-icons/claude.png',
       defaultWorkingDir: existingProgram?.defaultWorkingDir || '~/projects',
+      icon: existingProgram?.icon || '/assets/program-icons/claude.png',
+      name: existingProgram?.name || '',
     },
   });
 
   const commandValue = useWatch({ control, name: 'command' });
-
-  useEffect(() => {
-    setValue('icon', selectedIcon);
-  }, [selectedIcon, setValue]);
+  const selectedIcon = useWatch({ control, name: 'icon' });
+  const commandPreview = commandValue ? `${commandValue} --workspace ~/projects/my-app` : null;
 
   useEffect(() => {
     if (cliPrograms.length > 0) return;
     void sessionApi.loadCliPrograms().catch(() => undefined);
   }, [cliPrograms.length, sessionApi]);
+
+  useEffect(() => {
+    if (!existingProgram) return;
+    reset({
+      command: existingProgram.command,
+      defaultWorkingDir: existingProgram.defaultWorkingDir || '~/projects',
+      icon: existingProgram.icon,
+      name: existingProgram.name,
+    });
+  }, [existingProgram, reset]);
 
   const onSubmit = async (data: CliProgramFormData) => {
     try {
@@ -228,6 +263,7 @@ function CliProgramEditorContent() {
 
   const handleDelete = async () => {
     if (!existingProgram) return;
+
     try {
       await sessionApi.deleteCliProgram(existingProgram.id);
       setShowDeleteModal(false);
@@ -238,256 +274,218 @@ function CliProgramEditorContent() {
     }
   };
 
-  // Command preview
-  const commandPreview = commandValue ? `${commandValue} --workspace ~/projects/my-app` : null;
-
   return (
-    <div
-      className="min-h-dvh flex flex-col"
-      style={{ background: '#08080f', paddingTop: 'env(safe-area-inset-top, 44px)' }}
-    >
-      {/* Navbar */}
-      <header
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-      >
-        <button
-          onClick={() => router.back()}
-          className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/5 active:scale-90 transition-transform duration-150"
-          aria-label="Go back"
-        >
-          <X size={18} className="text-white/70" />
-        </button>
-        <h1 className="text-base font-semibold text-white/90">
-          {isEditing ? 'Edit Program' : 'Add CLI Program'}
-        </h1>
-        {/* Save shortcut for edit mode */}
-        {isEditing && isDirty ? (
-          <button
-            form="cli-program-form"
-            type="submit"
-            className="text-sm font-semibold text-purple-400 active:opacity-70 transition-opacity"
-          >
-            Save
-          </button>
-        ) : (
-          <div className="w-9" aria-hidden="true" />
-        )}
-      </header>
+    <div className="flex min-h-dvh flex-col bg-[#08080f]">
+      <MobileScreenHeader
+        onBack={() => router.back()}
+        rightActions={
+          isEditing && isDirty ? (
+            <MobileActionButton
+              form="cli-program-form"
+              label="Save program"
+              size="sm"
+              type="submit"
+            >
+              Save
+            </MobileActionButton>
+          ) : undefined
+        }
+        subtitle="Saved presets keep new-session setup short and consistent."
+        title={isEditing ? 'Edit Program' : 'Add CLI Program'}
+      />
 
-      {/* Scrollable form */}
-      <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto" id="main-content" tabIndex={-1}>
         <form
+          className="space-y-6 px-4 pb-8 pt-3"
           id="cli-program-form"
           onSubmit={handleSubmit(onSubmit)}
-          className="px-4 pt-5 pb-8 space-y-6"
         >
-          {/* Icon picker */}
+          <InlineAlertBanner
+            message="Keep commands direct and readable. Shell operators stay blocked so saved presets cannot smuggle chained commands."
+            title="Program safety"
+          />
+
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-purple-400/70 mb-3">
+            <label className="mb-3 block text-xs font-semibold uppercase tracking-widest text-purple-400/70">
               Icon
             </label>
-
-            {/* Current icon + toggle */}
-            <div className="flex items-center gap-4 mb-3">
+            <div className="mb-3 flex items-center gap-4">
               <button
-                type="button"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-150 active:scale-95 ${
+                aria-expanded={showEmojiPicker}
+                aria-label="Change icon"
+                className={`interactive-focus-ring mobile-touch-target flex h-16 w-16 items-center justify-center rounded-2xl transition-all duration-150 active:scale-95 ${
                   showEmojiPicker
                     ? 'border-purple-500/50 bg-purple-500/15'
-                    : 'bg-white/5 border border-white/10 hover:bg-white/8'
+                    : 'border border-white/10 bg-white/5 hover:bg-white/8'
                 }`}
-                style={{ border: showEmojiPicker ? '1px solid rgba(124,58,237,0.5)' : undefined }}
-                aria-label="Change icon"
-                aria-expanded={showEmojiPicker}
+                onClick={() => setShowEmojiPicker((current) => !current)}
+                type="button"
               >
                 <ProgramIcon alt="Program icon" icon={selectedIcon} size={30} />
               </button>
               <div>
-                <p className="text-sm font-medium text-white/70">Program Icon</p>
-                <p className="text-xs text-white/35 mt-0.5">
-                  {showEmojiPicker ? 'Tap an emoji to select' : 'Tap to change'}
+                <p className="text-sm font-medium text-white/72">Program Icon</p>
+                <p className="mt-0.5 text-xs leading-5 text-white/42">
+                  {showEmojiPicker ? 'Tap an emoji to select it.' : 'Tap to change the icon.'}
                 </p>
               </div>
             </div>
-
-            {/* Emoji grid */}
-            {showEmojiPicker && (
+            {showEmojiPicker ? (
               <div
-                className="rounded-2xl overflow-hidden slide-up"
+                className="slide-up overflow-hidden rounded-2xl"
                 style={{
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.09)',
                 }}
               >
                 <EmojiPicker
-                  selected={selectedIcon}
                   onSelect={(emoji) => {
-                    setSelectedIcon(emoji);
                     setValue('icon', emoji);
                     setShowEmojiPicker(false);
                   }}
+                  selected={selectedIcon}
                 />
               </div>
-            )}
+            ) : null}
           </div>
 
-          {/* Name */}
           <FormField
-            label="Display Name"
-            sublabel="How this program appears in session cards and the program picker"
+            description="How this program appears in session cards and the program picker."
             error={errors.name?.message}
+            htmlFor="name"
+            label="Display Name"
           >
             <input
-              type="text"
-              placeholder="e.g. Claude Code"
-              className="w-full px-4 py-3 rounded-xl text-sm text-white/80 placeholder-white/25 input-focus transition-all duration-200"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.09)',
-              }}
               {...register('name', {
+                maxLength: { message: 'Name must be under 32 characters', value: 32 },
+                minLength: { message: 'Name must be at least 2 characters', value: 2 },
                 required: 'Display name is required',
-                minLength: { value: 2, message: 'Name must be at least 2 characters' },
-                maxLength: { value: 32, message: 'Name must be under 32 characters' },
               })}
+              aria-describedby="name-message"
+              aria-invalid={Boolean(errors.name)}
+              className="input-focus w-full rounded-xl px-4 py-3 text-sm text-white/84 placeholder:text-white/25 transition-all duration-200"
+              id="name"
+              placeholder="e.g. Claude Code"
+              type="text"
             />
           </FormField>
 
-          {/* Command */}
           <FormField
-            label="Command"
-            sublabel="The executable to run. Must be available in PATH on the host machine."
+            description="The executable must be available in PATH on the host machine."
             error={errors.command?.message}
+            htmlFor="command"
+            label="Command"
           >
             <div className="relative">
               <Terminal
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30"
                 size={15}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
               />
               <input
-                type="text"
-                placeholder="e.g. claude"
-                className="w-full pl-9 pr-4 py-3 rounded-xl text-sm text-white/80 placeholder-white/25 input-focus transition-all duration-200 font-mono"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                }}
                 {...register('command', {
-                  required: 'Command is required',
                   pattern: {
+                    message: 'Enter a valid command with no leading or trailing spaces',
                     value: /^[^\s]+(\s+[^\s]+)*$/,
-                    message: 'Enter a valid command (no leading/trailing spaces)',
                   },
-                  validate: (v) =>
-                    !v.includes(';') && !v.includes('&&') && !v.includes('|')
+                  required: 'Command is required',
+                  validate: (value) =>
+                    !value.includes(';') && !value.includes('&&') && !value.includes('|')
                       ? true
                       : 'Command cannot contain shell operators for security',
                 })}
+                aria-describedby="command-message"
+                aria-invalid={Boolean(errors.command)}
+                className="input-focus w-full rounded-xl py-3 pl-9 pr-4 text-sm font-mono text-white/84 placeholder:text-white/25 transition-all duration-200"
+                id="command"
+                placeholder="e.g. claude"
+                type="text"
               />
             </div>
           </FormField>
 
-          {/* Command preview */}
-          {commandPreview && (
+          {commandPreview ? (
             <div
-              className="rounded-xl px-4 py-3 fade-in"
+              className="fade-in rounded-xl px-4 py-3"
               style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)' }}
             >
-              <p className="text-[0.625rem] uppercase tracking-widest font-semibold text-white/25 mb-1.5">
+              <p className="mb-1.5 text-[0.625rem] font-semibold uppercase tracking-widest text-white/25">
                 Preview
               </p>
-              <code className="text-xs font-mono text-green-400/80 leading-relaxed break-all">
+              <code className="break-all text-xs font-mono leading-relaxed text-green-400/80">
                 $ {commandPreview}
               </code>
             </div>
-          )}
+          ) : null}
 
-          {/* Default working directory */}
           <FormField
-            label="Default Working Directory"
-            sublabel="Pre-filled workspace path when creating new sessions with this program"
+            description="Pre-filled when creating new sessions with this program."
             error={errors.defaultWorkingDir?.message}
+            htmlFor="defaultWorkingDir"
+            label="Default Working Directory"
           >
             <div className="relative">
               <Folder
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30"
                 size={15}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
               />
               <input
-                type="text"
-                placeholder="~/projects"
-                className="w-full pl-9 pr-4 py-3 rounded-xl text-sm text-white/80 placeholder-white/25 input-focus transition-all duration-200 font-mono"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                }}
                 {...register('defaultWorkingDir', {
-                  validate: (v) =>
-                    !v || v.startsWith('~') || v.startsWith('/')
+                  validate: (value) =>
+                    !value || value.startsWith('~') || value.startsWith('/')
                       ? true
                       : 'Path must start with ~ or /',
                 })}
+                aria-describedby="defaultWorkingDir-message"
+                aria-invalid={Boolean(errors.defaultWorkingDir)}
+                className="input-focus w-full rounded-xl py-3 pl-9 pr-4 text-sm font-mono text-white/84 placeholder:text-white/25 transition-all duration-200"
+                id="defaultWorkingDir"
+                placeholder="~/projects"
+                type="text"
               />
             </div>
           </FormField>
 
-          {/* Program info card (edit mode) */}
-          {isEditing && existingProgram && (
+          {isEditing && existingProgram ? (
             <div
-              className="rounded-2xl p-4 fade-in"
+              className="fade-in rounded-2xl p-4"
               style={{
                 background: 'rgba(124,58,237,0.05)',
                 border: '1px solid rgba(124,58,237,0.15)',
               }}
             >
-              <p className="text-[0.625rem] uppercase tracking-widest font-semibold text-purple-400/50 mb-3">
+              <p className="mb-3 text-[0.625rem] font-semibold uppercase tracking-widest text-purple-400/50">
                 Program Info
               </p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-white/40">ID</span>
-                  <code className="text-xs font-mono text-white/35">{existingProgram.id}</code>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">ID</span>
+                  <code className="text-xs text-white/42">{existingProgram.id}</code>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-white/40">Sessions using this</span>
-                  <span className="text-xs font-medium text-white/60">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/45">Sessions using this preset</span>
+                  <span className="text-white/68">
                     {
                       sessions.filter((session) => session.cliProgram.id === existingProgram.id)
                         .length
-                    }{' '}
-                    session(s)
+                    }
                   </span>
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
-          {/* Validation summary */}
-          {Object.keys(errors).length > 0 && (
-            <div
-              className="rounded-xl px-4 py-3 flex items-start gap-2.5 fade-in"
-              style={{
-                background: 'rgba(239,68,68,0.08)',
-                border: '1px solid rgba(239,68,68,0.2)',
-              }}
-            >
-              <AlertCircle size={15} className="text-red-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-400">Fix the errors above</p>
-                <p className="text-xs text-red-400/70 mt-0.5">
-                  {Object.keys(errors).length} field(s) need attention
-                </p>
-              </div>
-            </div>
-          )}
+          {Object.keys(errors).length > 0 ? (
+            <InlineAlertBanner
+              message={`${Object.keys(errors).length} field(s) still need attention before this preset can be saved.`}
+              title="Fix the highlighted fields"
+              tone="warning"
+            />
+          ) : null}
         </form>
-      </div>
+      </main>
 
-      {/* Bottom action bar */}
       <div
-        className="flex-shrink-0 px-4 py-3 space-y-2.5"
+        className="space-y-2.5 px-4 py-3"
         style={{
           paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
           background: 'rgba(8,8,15,0.9)',
@@ -496,16 +494,15 @@ function CliProgramEditorContent() {
           WebkitBackdropFilter: 'blur(20px)',
         }}
       >
-        {/* Save button */}
         <button
-          type="submit"
-          form="cli-program-form"
+          className="accent-gradient accent-glow interactive-focus-ring flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-semibold text-white transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isSubmitting}
-          className="w-full py-4 rounded-2xl text-sm font-semibold text-white accent-gradient accent-glow active:scale-[0.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          form="cli-program-form"
+          type="submit"
         >
           {isSubmitting ? (
             <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               <span>{isEditing ? 'Saving…' : 'Adding Program…'}</span>
             </>
           ) : (
@@ -516,28 +513,26 @@ function CliProgramEditorContent() {
           )}
         </button>
 
-        {/* Delete button (edit mode only) */}
-        {isEditing && (
+        {isEditing ? (
           <button
-            type="button"
+            className="interactive-focus-ring flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500/8 py-3.5 text-sm font-semibold text-red-400 transition-all duration-150 active:scale-[0.98]"
             onClick={() => setShowDeleteModal(true)}
-            className="w-full py-3.5 rounded-2xl text-sm font-semibold text-red-400 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2"
-            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+            style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+            type="button"
           >
             <Trash2 size={15} />
             <span>Delete Program</span>
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* Delete confirm modal */}
-      {showDeleteModal && existingProgram && (
+      {showDeleteModal && existingProgram ? (
         <DeleteConfirmModal
-          programName={existingProgram.name}
-          onConfirm={handleDelete}
           onCancel={() => setShowDeleteModal(false)}
+          onConfirm={() => void handleDelete()}
+          programName={existingProgram.name}
         />
-      )}
+      ) : null}
     </div>
   );
 }

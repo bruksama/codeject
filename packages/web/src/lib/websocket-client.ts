@@ -20,7 +20,7 @@ export class WebSocketClient {
   private manuallyClosed = false;
 
   constructor(
-    private readonly url: string,
+    private readonly url: string | (() => string),
     private readonly options: WebSocketClientOptions
   ) {}
 
@@ -32,7 +32,7 @@ export class WebSocketClient {
     this.manuallyClosed = false;
     this.options.onStatus?.('connecting');
 
-    const socket = new WebSocket(this.url);
+    const socket = new WebSocket(this.resolveUrl());
     this.socket = socket;
 
     socket.addEventListener('open', () => {
@@ -119,5 +119,9 @@ export class WebSocketClient {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
+  }
+
+  private resolveUrl() {
+    return typeof this.url === 'function' ? this.url() : this.url;
   }
 }
