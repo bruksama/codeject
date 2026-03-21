@@ -91,6 +91,17 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 - remote access named tunnel hiện có `Auto-start`; quick tunnel vẫn chỉ start thủ công
 - thiết bị remote có luồng `Device Auth` riêng để lưu bearer key trong browser sau khi mở public URL hoặc QR
 
+## Web UX Reoptimization cập nhật 2026-03-22
+
+- browser zoom đã được bật lại; shared focus ring, skip-link, reduced-motion fallback, và touch target 44x44 được áp ở web shell
+- sessions list, chat, new session, và CLI program editor dùng header/action pattern đồng nhất hơn, contrast metadata rõ hơn, và inline error/recovery state ổn hơn
+- `Settings` đã tách thành hub ngắn với route con `Appearance`, `Remote Access`, và `About`
+- QR code remote access chỉ load khi mở detail flow tương ứng; `qrcode` không còn nằm trên đường tải ban đầu của settings hub
+- route-level Zustand subscriptions giờ dùng selector hẹp hơn; API key trong browser được cache với invalidation theo storage/visibility; repeated cards/messages dùng `content-visibility` an toàn hơn
+- `Reset Local Settings` giờ xóa luôn bearer key lưu riêng trong browser; nếu remote auth bị `401` thì client cũng flush key cache và tunnel snapshot cũ để tránh giữ trạng thái stale
+- reconnect WebSocket resolve lại URL theo bearer key mới nhất đang có trong browser storage, nên rotate key rồi reconnect không dùng query token cũ
+- settings confirm modal và QR modal đã được harden cho accessibility: focus vào action đầu tiên, `Escape` để đóng, và trả focus về control trước đó
+
 ## Ranh giới hiện tại
 
 - host vẫn cần `tmux`

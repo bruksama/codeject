@@ -20,10 +20,12 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
 - `Settings > Appearance > Font Size` đổi cỡ chữ toàn app ngay lập tức, lưu theo từng trình duyệt, và scale luôn khoảng trống chat/composer để dễ đọc hơn.
 - `Settings > Appearance > Accent Color` đổi màu nhấn toàn app, cũng lưu theo từng trình duyệt.
+- Settings giờ là một hub gọn hơn, tách `Appearance`, `Remote Access`, và `About` thành các màn hình riêng để dễ scan trên điện thoại.
 - Inline action cards cho confirm, select, và free-text input khi CLI chờ phản hồi.
 - Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
 - Composer gợi ý lệnh ClaudeKit ổn định ngay khi token đầu tiên bắt đầu bằng `/` cho Claude session hoặc `$` cho Codex session.
 - Với `Claude Code` và `OpenAI Codex`, chat giữ loading cho tới khi transcript xác nhận final answer; commentary và tool-progress không render thành bubble assistant.
+- Shared mobile guardrails đã bật lại browser zoom, thêm visible focus state, touch target tối thiểu 44x44, và reduced-motion fallback cho toàn app.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
 - Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
 - Hỗ trợ quick tunnel mặc định và named tunnel token-based cho domain riêng.
@@ -87,6 +89,11 @@ Chi tiết hơn xem `docs/getting-started.md`.
    - Named tunnel: URL cố định trên domain Cloudflare của bạn.
    - Named tunnel có thể bật auto-start sau khi đã lưu hostname + token.
    - Trên thiết bị remote, dán bearer key vào `Settings > Remote Access > Device Auth` một lần để browser đó tự gửi cho REST/WebSocket.
+   - Nếu bearer key lưu trên thiết bị remote không còn hợp lệ, UI sẽ xóa trạng thái tunnel cũ trên browser đó và yêu cầu dán lại key.
+7. Nếu cần đổi các phần ít dùng hơn trong Settings:
+   - `Settings` chỉ còn là hub ngắn.
+   - Vào từng màn hình `Appearance`, `Remote Access`, hoặc `About` để chỉnh chi tiết.
+   - `Reset Local Settings` cũng xóa bearer key đã lưu trên browser hiện tại, nên thiết bị đó sẽ cần lưu lại key sau khi reset.
 
 Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.md`.
 

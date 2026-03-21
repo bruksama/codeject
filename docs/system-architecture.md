@@ -29,12 +29,17 @@ Frontend được build thành static export và được backend phục vụ tr
 
 - Next.js 16 App Router
 - Zustand store cho local UI state va backend-hydrated state
-- màn hình session list, new session, chat, settings
+- màn hình session list, new session, chat, settings hub, settings detail routes
 - WebSocket client có reconnect
 - action card inline cho confirm, select, va free-input
 - chat composer có first-token command suggestion theo provider: Claude dùng `/`, Codex dùng `$`
 - `AppSettings.fontSize` là UI preference phía frontend, đổi từ `Settings > Appearance`, persist trong browser-local Zustand/localStorage thay vì lưu xuống backend store
 - root layout apply `--app-font-size` va `--app-font-scale` lên `documentElement`; script init chạy trước hydration để tránh first-paint flash sai cỡ chữ
+- shared web shell có skip-link, visible focus states, 44x44 touch-target baseline, va reduced-motion fallback
+- settings được chia thành `/settings`, `/settings/appearance`, `/settings/remote-access`, va `/settings/about`
+- `qrcode` chỉ load khi remote-access QR modal thực sự mở; browser API key reads được cache va invalidate theo `storage`/`visibilitychange`
+- WebSocket URL được resolve lười ở mỗi lần connect/reconnect, nên query token luôn lấy bearer key mới nhất đang lưu trong browser
+- shared modal hook cho confirm/QR dialog focus action đầu tiên khi mở, hỗ trợ `Escape`, va restore focus về control trước đó khi đóng
 
 ### Backend
 
@@ -107,6 +112,8 @@ Với `Claude Code` va `OpenAI Codex`, chat assistant hiện là final-only:
 - WebSocket không local: dùng `?token=<key>` trên `/ws/:sessionId`
 - API key được hash trước khi lưu
 - QR remote chỉ chia sẻ public URL
+- remote browser lưu bearer key riêng theo từng thiết bị; `Reset Local Settings` trên browser đó cũng xóa key đã lưu
+- nếu remote access status trả `401`, client xóa bearer key local và reset tunnel metadata đang cache để không giữ stale remote-access state
 
 ## Remote access
 
