@@ -25,6 +25,7 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
 - Composer gợi ý lệnh ClaudeKit ổn định ngay khi token đầu tiên bắt đầu bằng `/` cho Claude session hoặc `$` cho Codex session.
 - Với `Claude Code` và `OpenAI Codex`, chat giữ loading cho tới khi transcript xác nhận final answer; commentary và tool-progress không render thành bubble assistant.
+- Khi WebSocket chập chờn, chat có banner reconnect/disconnect, toast retry sau nhiều lần fail, và session list dùng status dot gọn hơn để thấy phiên nào đang sống.
 - Shared mobile guardrails đã bật lại browser zoom, thêm visible focus state, touch target tối thiểu 44x44, và reduced-motion fallback cho toàn app.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
 - Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
@@ -67,6 +68,19 @@ Các bước:
 3. Mở `http://localhost:3500`
 4. Server lắng nghe ở `PORT` hoặc `3500`.
 
+Kiểm tra nhanh sau khi sửa code:
+
+1. Chạy lint:
+   - `npm run lint`
+2. Chạy type-check:
+   - `npm run type-check`
+3. Chạy build:
+   - `npm run build`
+4. Chạy test toàn workspace:
+   - `npm test`
+
+`npm test` hiện chạy cả server test (`node:test`) và web test (`Vitest`).
+
 Chi tiết hơn xem `docs/getting-started.md`.
 
 ## Cách sử dụng cơ bản
@@ -106,6 +120,7 @@ Giới hạn hiện tại:
 ## Kiến trúc và công nghệ
 
 - Frontend: Next.js 16, React 19, Tailwind CSS 4, Zustand.
+- Frontend test: Vitest + React Testing Library cho store, WebSocket client, command suggestion, va action-card flow.
 - Backend: Express 5, WebSocket, `tmux`, `cloudflared`.
 - Shared: TypeScript workspace package.
 - Monorepo: npm workspaces + Turbo.
@@ -142,7 +157,7 @@ codeject/
 
 - Ứng dụng đã sẵn sàng để sử dụng.
 - Đã hoàn thành: monorepo, frontend, backend, persistence, WebSocket, `tmux` runtime, remote tunnel.
-- Giai đoạn hiện tại: dọn dẹp code, ổn định hóa, đơn giản hóa và cập nhật tài liệu.
+- Giai đoạn hiện tại: cleanup, ổn định hóa reconnect UX, tăng test coverage, và cập nhật tài liệu.
 
 Chi tiết roadmap xem `docs/project-roadmap.md`.
 
@@ -153,8 +168,7 @@ Chi tiết roadmap xem `docs/project-roadmap.md`.
 - Các kịch bản sử dụng: `docs/usage-recipes.md`
 - Hướng dẫn chạy và triển khai: `docs/deployment-guide.md`
 - Lộ trình dự án: `docs/project-roadmap.md`
-- Tiêu chuẩn code: `docs/code-standards.md`
-- Hướng dẫn thiết kế UI: `docs/design-guidelines.md`
+- Coding standards cho agent: `docs/llm/coding-standards.md`
 
 Tài liệu tối ưu cho LLM:
 

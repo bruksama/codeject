@@ -31,8 +31,10 @@ Frontend được build thành static export và được backend phục vụ tr
 - Zustand store cho local UI state va backend-hydrated state
 - màn hình session list, new session, chat, settings hub, settings detail routes
 - WebSocket client có reconnect
+- chat screen có connection banner theo cycle reconnect/disconnect, auto-hide khi recover, va toast retry khi reconnect fail nhiều lần
 - action card inline cho confirm, select, va free-input
 - chat composer có first-token command suggestion theo provider: Claude dùng `/`, Codex dùng `$`
+- session list, new session, va CLI program editor đã tách render tree lớn thành local components để page-level state rõ hơn va file nhỏ hơn
 - `AppSettings.fontSize` là UI preference phía frontend, đổi từ `Settings > Appearance`, persist trong browser-local Zustand/localStorage thay vì lưu xuống backend store
 - root layout apply `--app-font-size` va `--app-font-scale` lên `documentElement`; script init chạy trước hydration để tránh first-paint flash sai cỡ chữ
 - shared web shell có skip-link, visible focus states, 44x44 touch-target baseline, va reduced-motion fallback
@@ -57,6 +59,13 @@ Frontend được build thành static export và được backend phục vụ tr
 - tunnel manager quản lý một process `cloudflared`
 - tunnel manager support `named-token` auto-start khi config local cho phép
 - websocket handler cho chat, action submission, runtime status, va heartbeat
+
+### Testing và verification
+
+- root workspace chạy `npm test` qua Turbo
+- server test dùng `node:test`
+- web test dùng Vitest + jsdom + React Testing Library
+- web coverage hiện tập trung vào app store persistence, WebSocket reconnect client, command suggestion logic, va action-card submit lifecycle
 
 ### Shared
 
@@ -86,6 +95,8 @@ Known bundled programs dùng local static assets trong web app. Custom programs 
 - device bearer key cho remote client: cũng lưu cục bộ trong browser storage của từng thiết bị
 
 Điều này có nghĩa là chat UI là bề mặt chính. Khi CLI chờ phản hồi, frontend ưu tiên hiển thị action card dựa trên terminal snapshot thay vì render terminal viewport trực tiếp. Nếu không suy ra được card an toàn, session vẫn bị đánh dấu `terminal-required` và UI chỉ hiện reason banner. Free-input card chỉ xóa draft sau khi gửi thành công va giữ disabled cho tới khi action hiện tại đổi, biến mất, hoặc connection rớt.
+
+Nếu WebSocket đã từng connected rồi mới rớt, chat screen chuyển sang reconnect feedback thay vì chỉ đứng im: banner đổi theo state `reconnecting`/`disconnected`, sau 5 giây sẽ hiện elapsed disconnect time, và sau 3 lần reconnect fail frontend đẩy thêm toast có action `Reconnect now`.
 
 Ở composer, autocomplete command chỉ nhìn token đầu tiên. Nó hỗ trợ gõ prefix namespace chưa hoàn chỉnh như `/ck:` hoặc `$ck:`, và khi accept suggestion thì chỉ thay token đầu đó, giữ nguyên trailing prompt text. Provider chưa hỗ trợ tiếp tục dùng composer behavior cũ.
 

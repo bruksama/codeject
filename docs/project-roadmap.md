@@ -20,7 +20,7 @@ Tất cả các phase xây dựng chính đã hoàn thành:
 
 - npm workspace monorepo
 - package `web`, `server`, `shared`
-- root scripts cho `dev`, `build`, `lint`, `type-check`, `start`
+- root scripts cho `dev`, `build`, `lint`, `type-check`, `test`, `start`
 
 ### Backend
 
@@ -101,6 +101,15 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 - `Reset Local Settings` giờ xóa luôn bearer key lưu riêng trong browser; nếu remote auth bị `401` thì client cũng flush key cache và tunnel snapshot cũ để tránh giữ trạng thái stale
 - reconnect WebSocket resolve lại URL theo bearer key mới nhất đang có trong browser storage, nên rotate key rồi reconnect không dùng query token cũ
 - settings confirm modal và QR modal đã được harden cho accessibility: focus vào action đầu tiên, `Escape` để đóng, và trả focus về control trước đó
+
+## Cleanup/Test Infra cập nhật 2026-03-23
+
+- web package đã gỡ `@dhiwise/component-tagger`, `recharts`, va `@netlify/plugin-nextjs` sau khi xác nhận không còn import/runtime usage
+- root workspace có `npm test` qua Turbo; web package có Vitest + jsdom setup riêng để test frontend logic
+- web test suite hiện cover Zustand app store, WebSocket client reconnect path, provider-aware command suggestions, va action-card submit lifecycle
+- các page `sessions-list`, `new-session-setup`, va `cli-program-editor` đã tách bớt render tree sang local components để giảm kích thước file va giữ page-level state rõ hơn
+- chat screen có connection banner dismissible, elapsed disconnect timer sau 5 giây, reconnect success auto-dismiss, va toast retry có action `Reconnect now`
+- session list card dùng connection status dot gọn hơn thay cho badge dài để scan nhanh trên màn hình nhỏ
 
 ## Ranh giới hiện tại
 

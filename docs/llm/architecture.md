@@ -6,6 +6,7 @@
 
 - Role: mobile-first React UI for listing sessions, creating sessions, viewing chat, and responding to CLI prompts via inline action cards.
 - Technology: Next.js 16 (App Router), React 19, Tailwind CSS 4, Zustand.
+- Verification: Vitest + jsdom + React Testing Library for frontend logic.
 - Talks to server via:
   - HTTP REST API under `/api/*`.
   - WebSocket under `/ws/:sessionId`.
@@ -70,7 +71,8 @@
 5. Transcript reader and terminal snapshot logic update chat messages and action-card state.
 6. For `Claude Code` and `OpenAI Codex`, the UI stays in loading until transcript state is `final`; intermediate commentary is not rendered as assistant chat content.
 7. Generic tail prompts such as `Project name:` or `Paste token:` become `free-input` cards in chat.
-8. If no safe card can be derived, the server still marks the session `terminal-required` and the UI shows a warning banner instead of a raw terminal viewport.
+8. When a previously connected WebSocket drops, the web UI tracks the disconnect cycle to show reconnect/disconnect status, elapsed disconnect time, and a manual reconnect action.
+9. If no safe card can be derived, the server still marks the session `terminal-required` and the UI shows a warning banner instead of a raw terminal viewport.
 
 ### Remote access flow
 
@@ -88,3 +90,4 @@
 - `Claude Code` and `OpenAI Codex` currently use final-only chat rendering, not visible token-by-token streaming.
 - Local requests bypass auth; non-local REST and WebSocket connections both require the same API key, but transport it differently.
 - Opaque arrow-key or full-screen TUIs are still not first-class chat cards.
+- Root workspace verification now expects `npm test` to run both server `node:test` and web Vitest suites.

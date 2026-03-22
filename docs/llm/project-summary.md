@@ -33,6 +33,17 @@
   - `config.json`
   - `sessions/*.json`
 
+## Verification model
+
+- Root verification now includes `npm test` in addition to `lint`, `type-check`, and `build`.
+- Server tests use `node:test`.
+- Web tests use Vitest + jsdom + React Testing Library.
+- Current web test focus:
+  - Zustand app-store persistence and session selection behavior
+  - WebSocket client queue/reconnect behavior
+  - provider-aware command suggestions
+  - inline action-card submit lifecycle
+
 ## Auth model (high level)
 
 - Local requests: bypass auth.
@@ -45,3 +56,9 @@
 
 - Human docs (Vietnamese): `docs/*.md`
 - LLM docs (English, compact): `docs/llm/*.md`
+
+## Recent cleanup/stabilization notes
+
+- Removed dead web dependencies: `@dhiwise/component-tagger`, `recharts`, `@netlify/plugin-nextjs`.
+- Decomposed the largest web route files into local components to keep page-level state orchestration smaller.
+- Added reconnect UX in chat: dismissible status banner, elapsed disconnect timer, reconnect success auto-hide, and retry toast with manual reconnect action.
