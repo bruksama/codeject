@@ -48,6 +48,22 @@ function getSessionPreview(session: Session): string {
   return 'Ready to start terminal';
 }
 
+function getSessionCardConnectionStatus(session: Session) {
+  if (session.status === 'connected') {
+    return 'connected' as const;
+  }
+
+  if (session.status === 'connecting' || session.status === 'starting') {
+    return 'starting' as const;
+  }
+
+  if (session.status === 'error') {
+    return 'error' as const;
+  }
+
+  return 'disconnected' as const;
+}
+
 export default function SessionCard({ session, onDelete }: SessionCardProps) {
   const router = useRouter();
   const setActiveSession = useAppStore(selectSetActiveSession);
@@ -112,6 +128,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
   };
 
   const preview = getSessionPreview(session);
+  const connectionStatus = getSessionCardConnectionStatus(session);
 
   return (
     <div
@@ -180,7 +197,7 @@ export default function SessionCard({ session, onDelete }: SessionCardProps) {
             <div className="flex items-center justify-between gap-2 mb-0.5">
               <span className="text-sm font-semibold text-white/90 truncate">{session.name}</span>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <ConnectionBadge showLabel size="sm" status={session.status} />
+                <ConnectionBadge size="md" status={connectionStatus} />
                 <span className="text-[0.6875rem] text-white/45">{relativeTime}</span>
               </div>
             </div>

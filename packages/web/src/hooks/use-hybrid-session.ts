@@ -3,7 +3,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   type ChatState,
-  type ChatStatePhase,
   type ConnectionStatus,
   type Message,
   type SurfaceRequirement,
@@ -12,33 +11,36 @@ import { getWebSocketUrl } from '@/lib/api-client';
 import { WebSocketClient } from '@/lib/websocket-client';
 import { useAppStore } from '@/stores/useAppStore';
 import {
+  buildInterruptedChatState,
+  buildOptimisticPromptState,
   mergeOptimisticMessages,
   normalizeChatState,
   normalizeMessage,
   normalizeTerminalRuntime,
+  type OptimisticPromptState,
   reconcileSubmittingActionId,
 } from './use-hybrid-session-helpers';
-
 const EMPTY_MESSAGES: Message[] = [];
-
 interface HybridState {
   chatState?: ChatState;
+  hasConnected: boolean;
   lastError: string | null;
-  optimisticPrompt?: {
-    acknowledgedAssistant: boolean;
-    acknowledgedUser: boolean;
-    assistantMessage: Message;
-    prompt: string;
-    userMessage: Message;
-  };
+  lastDisconnectedAt: Date | null;
+  lastReconnectedAt: Date | null;
+  optimisticPrompt?: OptimisticPromptState;
   submittingActionId: string | null;
   status: ConnectionStatus;
   surfaceRequirement: SurfaceRequirement;
+  reconnectAttempts: number;
 }
 
 export function useHybridSession(sessionId: string | undefined) {
   const [state, setState] = useState<HybridState>({
     lastError: null,
+    hasConnected: false,
+    lastDisconnectedAt: null,
+    lastReconnectedAt: null,
+    reconnectAttempts: 0,
     submittingActionId: null,
     status: 'idle',
     surfaceRequirement: 'terminal-available',
@@ -51,12 +53,24 @@ export function useHybridSession(sessionId: string | undefined) {
     (store) =>
       store.sessions.find((session) => session.id === sessionId)?.messages ?? EMPTY_MESSAGES
   );
-
   const handleStatus = useEffectEvent((status: ConnectionStatus) => {
     if (!sessionId) return;
     setState((current) => ({
       ...current,
+      hasConnected: current.hasConnected || status === 'connected',
+      lastDisconnectedAt:
+        status === 'connected' || status === 'idle'
+          ? null
+          : status === 'disconnected' && current.hasConnected
+            ? (current.lastDisconnectedAt ?? new Date())
+            : current.lastDisconnectedAt,
       lastError: status === 'connected' || status === 'idle' ? null : current.lastError,
+      lastReconnectedAt:
+        status === 'connected' && current.lastDisconnectedAt
+          ? new Date()
+          : current.lastReconnectedAt,
+      reconnectAttempts:
+        status === 'connected' || status === 'idle' ? 0 : current.reconnectAttempts,
       status,
       submittingActionId: status === 'connected' ? current.submittingActionId : null,
     }));
@@ -67,10 +81,18 @@ export function useHybridSession(sessionId: string | undefined) {
     if (!sessionId) return;
 
     const client = new WebSocketClient(() => getWebSocketUrl(sessionId), {
-      onError: (message) => {
+      onError: (message, kind) => {
+        if (kind === 'transport') {
+          return;
+        }
+
         setState((current) => ({
           ...current,
+          lastDisconnectedAt: current.hasConnected
+            ? (current.lastDisconnectedAt ?? new Date())
+            : current.lastDisconnectedAt,
           lastError: message,
+          lastReconnectedAt: null,
           status: 'error',
           submittingActionId: null,
         }));
@@ -185,6 +207,12 @@ export function useHybridSession(sessionId: string | undefined) {
             return;
         }
       },
+      onReconnectAttempt: (attempt) => {
+        setState((current) => ({
+          ...current,
+          reconnectAttempts: attempt,
+        }));
+      },
       onStatus: handleStatus,
     });
 
@@ -202,22 +230,15 @@ export function useHybridSession(sessionId: string | undefined) {
     disconnect() {
       clientRef.current?.disconnect();
     },
+    hasConnected: state.hasConnected,
     interruptPrompt() {
       if (!sessionId) return;
       const timestamp = new Date();
-      const nextPhase: ChatStatePhase =
-        state.surfaceRequirement === 'terminal-required' ? 'terminal-required' : 'idle';
-      const nextChatState = state.chatState
-        ? {
-            ...state.chatState,
-            actionRequest: undefined,
-            lastAssistantMessageId: undefined,
-            phase: nextPhase,
-            terminalRequiredReason: undefined,
-            transcriptUpdatedAt: timestamp,
-          }
-        : undefined;
-
+      const nextChatState = buildInterruptedChatState(
+        state.chatState,
+        state.surfaceRequirement,
+        timestamp
+      );
       setState((current) => ({
         ...current,
         chatState: nextChatState,
@@ -230,50 +251,30 @@ export function useHybridSession(sessionId: string | undefined) {
       }, 90);
     },
     lastError: state.lastError,
+    lastDisconnectedAt: state.lastDisconnectedAt,
+    lastReconnectedAt: state.lastReconnectedAt,
     messages: mergeOptimisticMessages(sessionMessages, state.optimisticPrompt),
     reconnect() {
       setState((current) => ({
         ...current,
         lastError: null,
+        lastReconnectedAt: null,
+        reconnectAttempts: 0,
         submittingActionId: null,
       }));
       clientRef.current?.reconnect();
     },
+    reconnectAttempts: state.reconnectAttempts,
     sendPrompt(content: string) {
       const trimmed = content.trim();
       if (!trimmed) return false;
 
       const timestamp = new Date();
-      const promptKey = `${timestamp.getTime()}`;
+      const optimisticState = buildOptimisticPromptState(state.chatState, trimmed, timestamp);
       setState((current) => ({
         ...current,
-        chatState: {
-          ...current.chatState,
-          actionRequest: undefined,
-          lastAssistantMessageId: undefined,
-          lastPrompt: trimmed,
-          phase: 'awaiting-assistant',
-          terminalRequiredReason: undefined,
-          transcriptUpdatedAt: timestamp,
-        },
-        optimisticPrompt: {
-          acknowledgedAssistant: false,
-          acknowledgedUser: false,
-          assistantMessage: {
-            content: '',
-            id: `optimistic-assistant-${promptKey}`,
-            isStreaming: true,
-            role: 'assistant',
-            timestamp,
-          },
-          prompt: trimmed,
-          userMessage: {
-            content: trimmed,
-            id: `optimistic-user-${promptKey}`,
-            role: 'user',
-            timestamp,
-          },
-        },
+        chatState: optimisticState.chatState,
+        optimisticPrompt: optimisticState.optimisticPrompt,
         surfaceRequirement: 'terminal-available',
       }));
       clientRef.current?.send({ content: trimmed, type: 'chat:prompt' });

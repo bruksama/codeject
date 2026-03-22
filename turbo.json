@@ -23,6 +23,12 @@
         "^build"
       ],
       "outputs": []
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "cache": false
     }
   }
 }

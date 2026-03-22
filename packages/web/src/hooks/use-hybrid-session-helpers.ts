@@ -8,16 +8,17 @@ import {
   type TerminalRuntime,
 } from '@/types';
 
+export interface OptimisticPromptState {
+  acknowledgedAssistant: boolean;
+  acknowledgedUser: boolean;
+  assistantMessage: Message;
+  prompt: string;
+  userMessage: Message;
+}
+
 export function mergeOptimisticMessages(
   sessionMessages: Message[],
-  optimisticPrompt:
-    | {
-        acknowledgedAssistant: boolean;
-        acknowledgedUser: boolean;
-        assistantMessage: Message;
-        userMessage: Message;
-      }
-    | undefined
+  optimisticPrompt: OptimisticPromptState | undefined
 ) {
   if (!optimisticPrompt) {
     return sessionMessages;
@@ -71,4 +72,64 @@ export function reconcileSubmittingActionId(
     nextChatState?.actionRequest?.id === currentActionId
     ? currentActionId
     : null;
+}
+
+export function buildInterruptedChatState(
+  chatState: ChatState | undefined,
+  surfaceRequirement: SurfaceRequirement,
+  timestamp: Date
+): ChatState | undefined {
+  if (!chatState) {
+    return undefined;
+  }
+
+  return {
+    ...chatState,
+    actionRequest: undefined,
+    lastAssistantMessageId: undefined,
+    phase:
+      surfaceRequirement === 'terminal-required'
+        ? ('terminal-required' as const)
+        : ('idle' as const),
+    terminalRequiredReason: undefined,
+    transcriptUpdatedAt: timestamp,
+  };
+}
+
+export function buildOptimisticPromptState(
+  chatState: ChatState | undefined,
+  prompt: string,
+  timestamp: Date
+) {
+  const promptKey = `${timestamp.getTime()}`;
+
+  return {
+    chatState: {
+      ...chatState,
+      actionRequest: undefined,
+      lastAssistantMessageId: undefined,
+      lastPrompt: prompt,
+      phase: 'awaiting-assistant' as const,
+      terminalRequiredReason: undefined,
+      transcriptUpdatedAt: timestamp,
+    },
+    optimisticPrompt: {
+      acknowledgedAssistant: false,
+      acknowledgedUser: false,
+      assistantMessage: {
+        content: '',
+        id: `optimistic-assistant-${promptKey}`,
+        isStreaming: true,
+        role: 'assistant' as const,
+        timestamp,
+      },
+      prompt,
+      userMessage: {
+        content: prompt,
+        id: `optimistic-user-${promptKey}`,
+        role: 'user' as const,
+        timestamp,
+      },
+    } satisfies OptimisticPromptState,
+  };
 }

@@ -6,9 +6,12 @@ import {
   type ServerWebSocketMessage,
 } from '@codeject/shared';
 
+export type WebSocketErrorKind = 'session' | 'transport';
+
 interface WebSocketClientOptions {
-  onError?: (message: string) => void;
+  onError?: (message: string, kind: WebSocketErrorKind) => void;
   onMessage?: (message: ServerWebSocketMessage) => void;
+  onReconnectAttempt?: (attempt: number) => void;
   onStatus?: (status: ConnectionStatus) => void;
 }
 
@@ -50,28 +53,27 @@ export class WebSocketClient {
           this.options.onStatus?.(message.status);
         }
         if (message.type === 'terminal:error') {
-          this.options.onError?.(message.message);
+          this.options.onError?.(message.message, 'session');
         }
         this.options.onMessage?.(message);
       } catch {
-        this.options.onError?.('Invalid websocket frame');
+        this.options.onError?.('Invalid websocket frame', 'transport');
+        if (socket.readyState <= WebSocket.OPEN) {
+          socket.close();
+        }
       }
     });
 
     socket.addEventListener('close', () => {
       this.socket = null;
+      this.options.onStatus?.('disconnected');
       if (this.manuallyClosed) {
-        this.options.onStatus?.('disconnected');
         return;
       }
-      this.options.onStatus?.('connecting');
       this.scheduleReconnect();
     });
 
-    socket.addEventListener('error', () => {
-      this.options.onError?.('WebSocket connection failed');
-      this.options.onStatus?.('error');
-    });
+    socket.addEventListener('error', () => undefined);
   }
 
   disconnect() {
@@ -113,8 +115,10 @@ export class WebSocketClient {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
-    const delay = Math.min(1_000 * 2 ** this.reconnectAttempts, 10_000);
-    this.reconnectAttempts += 1;
+    const attempt = this.reconnectAttempts + 1;
+    const delay = Math.min(1_000 * 2 ** (attempt - 1), 10_000);
+    this.reconnectAttempts = attempt;
+    this.options.onReconnectAttempt?.(attempt);
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
