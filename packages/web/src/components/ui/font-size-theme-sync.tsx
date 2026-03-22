@@ -10,8 +10,10 @@ export default function FontSizeThemeSync() {
   useEffect(() => {
     const root = document.documentElement;
     const config = fontSizeScale[fontSize] ?? defaultFontSizeConfig;
+    const scale = Number(config.scale) || 1;
     root.style.setProperty('--app-font-size', config.size);
     root.style.setProperty('--app-font-scale', config.scale);
+    root.style.setProperty('--session-list-bottom-clearance', `${Math.round(104 * scale)}px`);
   }, [fontSize]);
 
   return null;

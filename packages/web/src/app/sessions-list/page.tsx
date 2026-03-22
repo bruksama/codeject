@@ -305,7 +305,10 @@ export default function SessionsListPage() {
         className="flex-1 overflow-y-auto px-4 pt-2"
         id="main-content"
         tabIndex={-1}
-        style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}
+        style={{
+          paddingBottom:
+            'calc(var(--session-list-bottom-clearance, 104px) + env(safe-area-inset-bottom, 0px))',
+        }}
       >
         {loadError ? (
           <div className="mb-3">

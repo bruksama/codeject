@@ -19,7 +19,8 @@ export default function FloatingActionButton({
       className="interactive-focus-ring mobile-touch-target fixed z-40 accent-gradient accent-glow fab-pulse rounded-full shadow-2xl active:scale-90 transition-transform duration-150"
       type="button"
       style={{
-        bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
+        bottom:
+          'calc(var(--session-list-bottom-clearance, 104px) + env(safe-area-inset-bottom, 0px))',
         right: '20px',
         width: 56,
         height: 56,

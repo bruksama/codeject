@@ -11,17 +11,21 @@ const FONT_SIZE_INIT_SCRIPT = `
   const root = document.documentElement;
   const fallback = ${JSON.stringify(defaultFontSizeConfig)};
   const scaleMap = ${JSON.stringify(fontSizeScale)};
+  const setFontScaleVars = (config) => {
+    const scale = Number(config.scale) || 1;
+    root.style.setProperty('--app-font-size', config.size);
+    root.style.setProperty('--app-font-scale', config.scale);
+    root.style.setProperty('--session-list-bottom-clearance', Math.round(104 * scale) + 'px');
+  };
 
   try {
     const raw = window.localStorage.getItem('codeject-storage');
     const parsed = raw ? JSON.parse(raw) : null;
     const fontSize = parsed?.state?.settings?.fontSize;
     const config = scaleMap[fontSize] ?? fallback;
-    root.style.setProperty('--app-font-size', config.size);
-    root.style.setProperty('--app-font-scale', config.scale);
+    setFontScaleVars(config);
   } catch {
-    root.style.setProperty('--app-font-size', fallback.size);
-    root.style.setProperty('--app-font-scale', fallback.scale);
+    setFontScaleVars(fallback);
   }
 })();
 `;
