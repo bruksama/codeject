@@ -80,6 +80,7 @@ export function useRemoteAccessSettings() {
       setTunnelDetails(null);
       setTunnelError(message);
       updateRemoteAccess({
+        autoStart: false,
         authKey: '',
         enabled: false,
         namedTunnelHostname: undefined,
@@ -94,6 +95,7 @@ export function useRemoteAccessSettings() {
   const syncRemoteAccessFromTunnel = useCallback(
     (tunnel: TunnelStatusResponse) => {
       updateRemoteAccess({
+        autoStart: tunnel.autoStart,
         enabled: tunnel.authConfigured,
         namedTunnelHostname: tunnel.namedTunnelHostname,
         namedTunnelTokenConfigured: tunnel.namedTunnelTokenConfigured,
@@ -264,6 +266,7 @@ export function useRemoteAccessSettings() {
       clearStoredApiKey();
       setTunnelDetails(null);
       updateRemoteAccess({
+        autoStart: false,
         authKey: '',
         enabled: false,
         namedTunnelHostname: undefined,
@@ -294,6 +297,8 @@ export function useRemoteAccessSettings() {
     tunnelDetails?.namedTunnelHostname ?? remoteAccess.namedTunnelHostname ?? '';
   const namedTunnelTokenConfigured =
     tunnelDetails?.namedTunnelTokenConfigured ?? remoteAccess.namedTunnelTokenConfigured;
+  const autoStart = tunnelDetails?.autoStart ?? remoteAccess.autoStart;
+  const canToggleTunnelAutoStart = Boolean(namedTunnelHostname && namedTunnelTokenConfigured);
   const tunnelBusy =
     isTunnelAction !== null ||
     isSavingTunnelConfig ||
@@ -301,6 +306,8 @@ export function useRemoteAccessSettings() {
     tunnelStatus === 'stopping';
 
   return {
+    autoStart,
+    canToggleTunnelAutoStart,
     canStartTunnel,
     handleRotateKey,
     handleSaveStoredKey,

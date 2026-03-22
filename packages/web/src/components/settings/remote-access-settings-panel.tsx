@@ -169,15 +169,15 @@ export function RemoteAccessSettingsPanel() {
                 </p>
               </div>
               <Toggle
-                checked={Boolean(remote.tunnelDetails?.autoStart)}
-                disabled={remote.tunnelBusy || !remote.namedTunnelTokenConfigured}
+                checked={remote.autoStart}
+                disabled={remote.tunnelBusy || !remote.canToggleTunnelAutoStart}
                 label="Auto-start named tunnel"
                 onChange={(checked) => void remote.handleSetTunnelAutoStart(checked)}
               />
             </div>
-            {!remote.namedTunnelTokenConfigured ? (
+            {!remote.canToggleTunnelAutoStart ? (
               <p className="text-sm leading-6 text-white/48">
-                Save a named tunnel token to enable auto-start.
+                Save the named tunnel hostname and token to enable auto-start.
               </p>
             ) : null}
             <div className="grid gap-3">

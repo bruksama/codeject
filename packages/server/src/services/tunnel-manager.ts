@@ -81,6 +81,12 @@ export class TunnelManager {
     if (autoStart && current.tunnelMode !== 'named-token') {
       throw new TunnelManagerError('Auto-start is only available for named tunnel mode.', 409);
     }
+    if (autoStart && (!current.namedTunnelHostname || !current.namedTunnelToken)) {
+      throw new TunnelManagerError(
+        'Save the named tunnel hostname and token before enabling auto-start.',
+        409
+      );
+    }
     await configStore.setRemoteAccess({ autoStart });
     return this.getStatus();
   }
@@ -100,8 +106,11 @@ export class TunnelManager {
       nextMode === 'named-token'
         ? normalizeSecretValue(input.namedTunnelToken, current.namedTunnelToken)
         : null;
+    const nextAutoStart =
+      nextMode === 'named-token' && Boolean(nextHostname && nextToken) ? current.autoStart : false;
 
     await configStore.setRemoteAccess({
+      autoStart: nextAutoStart,
       enabled: false,
       lastError: null,
       namedTunnelHostname: nextHostname,

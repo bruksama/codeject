@@ -167,6 +167,7 @@ export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stoppin
 export type TunnelMode = 'quick' | 'named-token';
 
 export interface RemoteAccessSettings {
+  autoStart: boolean;
   enabled: boolean;
   authKey: string;
   namedTunnelHostname?: string;

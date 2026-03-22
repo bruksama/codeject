@@ -20,6 +20,7 @@ const defaultState = {
     accentColor: '#7c3aed',
     fontSize: 'medium' as const,
     remoteAccess: {
+      autoStart: false,
       authKey: '',
       enabled: false,
       namedTunnelHostname: undefined,
