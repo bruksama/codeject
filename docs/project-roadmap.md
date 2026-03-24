@@ -111,11 +111,34 @@ Không còn phase tính năng lớn đang mở. Ưu tiên hiện tại:
 - chat screen có connection banner dismissible, elapsed disconnect timer sau 5 giây, reconnect success auto-dismiss, va toast retry có action `Reconnect now`
 - session list card dùng connection status dot gọn hơn thay cho badge dài để scan nhanh trên màn hình nhỏ
 
+## Wire/Notify cập nhật 2026-03-23
+
+- shared package hiện có Zod runtime schemas cho WebSocket wire protocol; server validate client frames, web validate server frames, va server dev mode assert outgoing frames
+- phía web, server frame sai schema giờ đi vào transport-failure path để đóng/reconnect socket thay vì bị drop âm thầm
+- `Settings > Appearance > Notifications` đã ship như opt-in browser preference lưu theo từng browser; stale enabled state sẽ tự clear nếu browser permission bị revoke
+- chat session view giờ có browser notification cho action-needed, reply-ready, terminal-error, va session-finished khi tab không focus
+- notification có thể đến từ pending action trong `chat:bootstrap` / `surface:update`, và final reply trong `chat:message` hoặc `chat:update`
+- web test suite hiện cover notification hook behavior; server test suite hiện cover malformed websocket frame rejection trước khi command execution chạy
+
+## Mobile Hardening cập nhật 2026-03-24
+
+- các screen chính phía web đã chuyển sang viewport-locked shell, nên header không còn trôi khỏi màn hình khi scroll nội dung dài trên mobile
+- chat screen giờ giữ header + composer cố định và chỉ transcript scroll; jump-to-latest không còn dính sát input khi đổi font size lớn
+- shared header/action sizing đã được siết lại để icon không collapse trên điện thoại hẹp và long assistant content không còn đẩy bubble tràn khỏi viewport
+
+## Terminal Tab cập nhật 2026-03-24
+
+- session view có lại tab `Terminal` bên cạnh `Chat`, nhưng giữ cách tiếp cận nhẹ: snapshot `<pre>` read-only thay vì xterm/full emulator
+- server broadcast frame `terminal:snapshot` trên WebSocket để web sync nội dung tmux pane theo thời gian thực
+- web có input bar + virtual keyboard cho `Enter`, `Tab`, `Esc`, arrows, `Ctrl+C`, `Ctrl+D`, `Ctrl+Z`, `Ctrl+L`, backspace, va delete
+- khi session bị `terminal-required` nhưng không có action card an toàn, tab `Terminal` hiện badge để kéo user sang luồng direct interaction
+- web/server test suite hiện cover terminal snapshot wire flow, key pass-through, hook state, va terminal component behavior
+
 ## Ranh giới hiện tại
 
 - host vẫn cần `tmux`
 - remote access vẫn cần `cloudflared`
 - transcript chat vẫn là best-effort extraction
 - `Claude Code` va `OpenAI Codex` không còn visible word-by-word streaming trong chat; đổi sang loading -> final answer để ưu tiên correctness
-- web UI không còn terminal viewport; approval, menu, va input lạ đi qua action card va free-input fallback
+- terminal tab hiện chỉ là snapshot + input surface nhẹ; chưa có full terminal emulation hay rich TUI rendering
 - opaque arrow-key hoặc full-screen TUI vẫn là giới hạn đã biết

@@ -18,13 +18,17 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Tạo, lưu, khôi phục và xóa nhiều session CLI.
 - Chọn chương trình CLI như Claude Code, Codex hoặc generic shell cho từng session.
 - Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
-- `Settings > Appearance > Font Size` đổi cỡ chữ toàn app ngay lập tức, lưu theo từng trình duyệt, và scale luôn khoảng trống chat/composer để dễ đọc hơn.
+- Chat screen giờ giữ header và composer cố định; chỉ transcript cuộn như app chat thông thường để theo dõi session dài trên điện thoại dễ hơn.
+- Session view có thêm tab `Terminal` với snapshot terminal read-only, input bar, và virtual keyboard cho Tab/Esc/arrows/Ctrl combos khi action card không đủ.
+- `Settings > Appearance > Font Size` đổi cỡ chữ toàn app ngay lập tức, lưu theo từng trình duyệt, và scale shared shell spacing đủ an toàn để header/action/composer không lệch trên mobile.
 - `Settings > Appearance > Accent Color` đổi màu nhấn toàn app, cũng lưu theo từng trình duyệt.
+- `Settings > Appearance > Notifications` cho phép opt-in browser notification khi agent cần approval, trả lời xong, gặp lỗi, hoặc về `idle` khi tab không còn focus.
 - Settings giờ là một hub gọn hơn, tách `Appearance`, `Remote Access`, và `About` thành các màn hình riêng để dễ scan trên điện thoại.
 - Inline action cards cho confirm, select, và free-text input khi CLI chờ phản hồi.
 - Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
 - Composer gợi ý lệnh ClaudeKit ổn định ngay khi token đầu tiên bắt đầu bằng `/` cho Claude session hoặc `$` cho Codex session.
 - Với `Claude Code` và `OpenAI Codex`, chat giữ loading cho tới khi transcript xác nhận final answer; commentary và tool-progress không render thành bubble assistant.
+- WebSocket frame ở client/server boundary được validate runtime bằng shared Zod schemas để mismatch hiện rõ hơn thay vì làm hỏng UI âm thầm.
 - Khi WebSocket chập chờn, chat có banner reconnect/disconnect, toast retry sau nhiều lần fail, và session list dùng status dot gọn hơn để thấy phiên nào đang sống.
 - Shared mobile guardrails đã bật lại browser zoom, thêm visible focus state, touch target tối thiểu 44x44, và reduced-motion fallback cho toàn app.
 - Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
@@ -95,16 +99,21 @@ Chi tiết hơn xem `docs/getting-started.md`.
    - Khi chọn gợi ý, composer chỉ thay token đầu và giữ nguyên phần prompt còn lại bạn đã gõ.
 4. Khi CLI cần approval, chọn option, hoặc nhập liệu:
    - Trả lời ngay trong action card được render trong chat.
+   - Nếu CLI đang ở menu dùng arrow-key, multi-select, hoặc prompt không recover được thành card an toàn, chuyển sang tab `Terminal` để gõ trực tiếp.
 5. Nếu chat hơi chật hoặc quá lớn trên thiết bị hiện tại:
    - Vào `Settings > Appearance > Font Size`.
    - Thay đổi áp dụng ngay cho toàn bộ UI và được nhớ lại trên chính trình duyệt đó.
-6. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
+6. Nếu muốn rời tab nhưng vẫn biết khi agent cần bạn:
+   - Vào `Settings > Appearance > Notifications`.
+   - Bật permission browser khi được hỏi.
+   - Trên iPhone/iPad Safari, cần thêm app vào Home Screen trước khi notification hoạt động.
+7. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
    - Quick tunnel: zero-setup, URL tạm.
    - Named tunnel: URL cố định trên domain Cloudflare của bạn.
    - Named tunnel có thể bật auto-start sau khi đã lưu hostname + token.
    - Trên thiết bị remote, dán bearer key vào `Settings > Remote Access > Device Auth` một lần để browser đó tự gửi cho REST/WebSocket.
    - Nếu bearer key lưu trên thiết bị remote không còn hợp lệ, UI sẽ xóa trạng thái tunnel cũ trên browser đó và yêu cầu dán lại key.
-7. Nếu cần đổi các phần ít dùng hơn trong Settings:
+8. Nếu cần đổi các phần ít dùng hơn trong Settings:
    - `Settings` chỉ còn là hub ngắn.
    - Vào từng màn hình `Appearance`, `Remote Access`, hoặc `About` để chỉnh chi tiết.
    - `Reset Local Settings` cũng xóa bearer key đã lưu trên browser hiện tại, nên thiết bị đó sẽ cần lưu lại key sau khi reset.
@@ -113,16 +122,16 @@ Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.m
 
 Giới hạn hiện tại:
 
-- Opaque arrow-key hoặc full-screen TUI chưa phải chat card thực sự; hỗ trợ tốt nhất hiện tại là prompt text, approval, và numbered select.
+- Terminal tab hiện là snapshot read-only + input/virtual keyboard, chưa phải terminal emulator đầy đủ; opaque arrow-key UI hoặc full-screen TUI vẫn có thể cần thao tác thủ công.
 - `Claude Code` va `OpenAI Codex` hiện không stream token-by-token lên chat; phản hồi chỉ hiện khi transcript có final answer an toàn.
 - Gợi ý command chỉ áp dụng cho provider đã hỗ trợ (`Claude Code`, `OpenAI Codex`); provider khác giữ hành vi composer cũ.
 
 ## Kiến trúc và công nghệ
 
 - Frontend: Next.js 16, React 19, Tailwind CSS 4, Zustand.
-- Frontend test: Vitest + React Testing Library cho store, WebSocket client, command suggestion, va action-card flow.
+- Frontend test: Vitest + React Testing Library cho store, WebSocket client, command suggestion, action-card flow, va terminal tab interactions.
 - Backend: Express 5, WebSocket, `tmux`, `cloudflared`.
-- Shared: TypeScript workspace package.
+- Shared: TypeScript workspace package + shared Zod wire schemas.
 - Monorepo: npm workspaces + Turbo.
 
 Tổng quan kiến trúc:

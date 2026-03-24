@@ -10,6 +10,7 @@ interface ChatComposerProps {
   className?: string;
   disabled?: boolean;
   errorMessage?: string | null;
+  isVisible?: boolean;
   isBusy?: boolean;
   onSuggestionMenuVisibilityChange?: (isOpen: boolean) => void;
   onInterrupt?: () => void;
@@ -26,6 +27,7 @@ export function ChatComposer({
   className = '',
   disabled = false,
   errorMessage,
+  isVisible = true,
   isBusy = false,
   onSuggestionMenuVisibilityChange,
   onInterrupt,
@@ -83,6 +85,14 @@ export function ChatComposer({
   useEffect(() => {
     onSuggestionMenuVisibilityChange?.(isCommandMenuOpen);
   }, [isCommandMenuOpen, onSuggestionMenuVisibilityChange]);
+
+  useEffect(() => {
+    if (!isVisible || !isCommandMenuOpen) {
+      return;
+    }
+
+    handleCommandMenuEscape();
+  }, [handleCommandMenuEscape, isCommandMenuOpen, isVisible]);
 
   return (
     <div className={className}>

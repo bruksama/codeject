@@ -432,8 +432,8 @@ export function buildTmuxSessionName(sessionId: string) {
   return `codeject-${sessionId}`;
 }
 
-function mapTerminalKeyToTmux(key: TerminalKey) {
-  return key === 'Enter' ? 'Enter' : 'Escape';
+export function mapTerminalKeyToTmux(key: TerminalKey) {
+  return key;
 }
 
 function normalizeSize(size: Partial<TerminalSize> | undefined, fallback?: TerminalSize): TerminalSize {

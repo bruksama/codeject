@@ -252,7 +252,7 @@ export default function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
   const label = languageLabels[language.toLowerCase()] || language.toUpperCase();
 
   return (
-    <div className="code-block my-2 max-w-full overflow-hidden">
+    <div className="code-block my-2 min-w-0 max-w-full overflow-hidden">
       {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-2 border-b border-white/8"
@@ -261,7 +261,7 @@ export default function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
         <span className="text-xs font-medium text-purple-400/80 font-mono">{label}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/80 transition-colors duration-150 px-2 py-1 rounded-md hover:bg-white/8 active:scale-95"
+          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs text-white/40 transition-colors duration-150 hover:bg-white/8 hover:text-white/80 active:scale-95"
           aria-label={copied ? 'Copied!' : 'Copy code'}
         >
           {copied ? (

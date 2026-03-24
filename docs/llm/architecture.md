@@ -7,6 +7,12 @@
 - Role: mobile-first React UI for listing sessions, creating sessions, viewing chat, and responding to CLI prompts via inline action cards.
 - Technology: Next.js 16 (App Router), React 19, Tailwind CSS 4, Zustand.
 - Verification: Vitest + jsdom + React Testing Library for frontend logic.
+- Notes:
+  - Browser notification support is opt-in per browser via `AppSettings.notifications`.
+  - Permission state is synced against the real browser permission when the app regains focus/visibility.
+  - Viewport-locked page shells keep headers fixed on mobile; chat keeps the header and composer dock static while only the transcript scrolls.
+  - Session view now exposes `Chat` and `Terminal` tabs; the terminal tab is a lightweight tmux snapshot viewer with an input bar and virtual special-key keyboard, not a full emulator.
+  - Font-size scaling also updates shell clearances for bottom navigation and the chat command-menu dock so large mobile text does not break header/action alignment.
 - Talks to server via:
   - HTTP REST API under `/api/*`.
   - WebSocket under `/ws/:sessionId`.
@@ -20,6 +26,9 @@
   - Expose `/api/*` routes for health, auth, sessions, config, tunnel.
   - Manage per-session mapping to tmux runtimes.
   - Read and write config and sessions under `~/.codeject`.
+  - Validate incoming client WebSocket frames with shared Zod schemas.
+  - In development, assert outgoing server WebSocket frames against the same shared schema.
+  - Broadcast `terminal:snapshot` frames so the web terminal tab can mirror tmux pane content.
   - Derive chat action cards in this order: snapshot structured prompt -> snapshot generic free-input prompt -> terminal-required reason-only fallback when no safe card can be inferred.
   - Gate `Claude Code` and `OpenAI Codex` assistant content on transcript final-answer state; terminal snapshots stay action-only for those providers.
   - Manage a single Cloudflare Tunnel process for remote access.
@@ -30,6 +39,7 @@
   - `Session`, `Message`, `ChatState`, `ChatActionRequest`
   - `CliProgram`, `AppSettings`
   - `TerminalRuntime`, `TerminalSnapshot`
+  - Zod schemas for `ClientWebSocketMessage`, `ServerWebSocketMessage`, and nested wire payloads
 
 ### tmux runtime
 
@@ -66,13 +76,15 @@
 
 1. User opens a session in the web UI.
 2. Web connects to `/ws/:sessionId`.
-3. User sends a prompt (`chat:prompt` event).
-4. Server forwards to the underlying CLI program via tmux.
-5. Transcript reader and terminal snapshot logic update chat messages and action-card state.
-6. For `Claude Code` and `OpenAI Codex`, the UI stays in loading until transcript state is `final`; intermediate commentary is not rendered as assistant chat content.
-7. Generic tail prompts such as `Project name:` or `Paste token:` become `free-input` cards in chat.
-8. When a previously connected WebSocket drops, the web UI tracks the disconnect cycle to show reconnect/disconnect status, elapsed disconnect time, and a manual reconnect action.
-9. If no safe card can be derived, the server still marks the session `terminal-required` and the UI shows a warning banner instead of a raw terminal viewport.
+3. Both sides validate wire frames against shared Zod schemas before trusting payload shape.
+4. User sends a prompt (`chat:prompt` event).
+5. Server forwards to the underlying CLI program via tmux.
+6. Transcript reader and terminal snapshot logic update chat messages and action-card state.
+7. For `Claude Code` and `OpenAI Codex`, the UI stays in loading until transcript state is `final`; intermediate commentary is not rendered as assistant chat content.
+8. Generic tail prompts such as `Project name:` or `Paste token:` become `free-input` cards in chat.
+9. If browser notifications are enabled and the tab is unfocused, the web app can emit notifications for action-needed, reply-ready, terminal-error, and session-finished events.
+10. When a previously connected WebSocket drops, the web UI tracks the disconnect cycle to show reconnect/disconnect status, elapsed disconnect time, and a manual reconnect action.
+11. If no safe card can be derived, the server still marks the session `terminal-required`; the UI shows a warning/banner state and can route the user to the terminal tab for direct input.
 
 ### Remote access flow
 
@@ -89,5 +101,5 @@
 - Runtime source of truth is tmux; chat transcript is derived UX state.
 - `Claude Code` and `OpenAI Codex` currently use final-only chat rendering, not visible token-by-token streaming.
 - Local requests bypass auth; non-local REST and WebSocket connections both require the same API key, but transport it differently.
-- Opaque arrow-key or full-screen TUIs are still not first-class chat cards.
+- The terminal tab is still snapshot-based, so opaque arrow-key or full-screen TUIs are not first-class emulated terminals yet.
 - Root workspace verification now expects `npm test` to run both server `node:test` and web Vitest suites.

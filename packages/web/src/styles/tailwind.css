@@ -382,6 +382,17 @@ summary:focus-visible,
 }
 
 /* Markdown styles inside chat */
+.markdown-content,
+.markdown-content p,
+.markdown-content div,
+.markdown-content span,
+.markdown-content a,
+.markdown-content blockquote {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .markdown-content p {
   margin-bottom: 8px;
   line-height: 1.6;
@@ -424,6 +435,8 @@ summary:focus-visible,
   padding: 1px 5px;
   font-size: 0.85em;
   color: var(--accent-primary);
+  overflow-wrap: anywhere;
+  white-space: break-spaces;
 }
 .markdown-content blockquote {
   border-left: 3px solid var(--accent-primary);

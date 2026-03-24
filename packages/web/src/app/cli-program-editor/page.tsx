@@ -17,10 +17,7 @@ export default function CliProgramEditorPage() {
   return (
     <Suspense
       fallback={
-        <div
-          className="flex min-h-dvh items-center justify-center"
-          style={{ background: '#08080f' }}
-        />
+        <div className="flex h-dvh items-center justify-center" style={{ background: '#08080f' }} />
       }
     >
       <CliProgramEditorContent />
@@ -105,7 +102,7 @@ function CliProgramEditorContent() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#08080f]">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#08080f]">
       <MobileScreenHeader
         onBack={() => router.back()}
         rightActions={

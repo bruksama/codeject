@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ServerWebSocketMessageSchema,
   type ClientWebSocketMessage,
   type ConnectionStatus,
   type ServerWebSocketMessage,
@@ -45,7 +46,18 @@ export class WebSocketClient {
 
     socket.addEventListener('message', (event) => {
       try {
-        const message = JSON.parse(event.data) as ServerWebSocketMessage;
+        const rawMessage = JSON.parse(event.data);
+        const parsedMessage = ServerWebSocketMessageSchema.safeParse(rawMessage);
+        if (!parsedMessage.success) {
+          console.warn('Invalid server websocket frame', parsedMessage.error.flatten());
+          this.options.onError?.('Invalid websocket frame', 'transport');
+          if (socket.readyState <= WebSocket.OPEN) {
+            socket.close();
+          }
+          return;
+        }
+
+        const message: ServerWebSocketMessage = parsedMessage.data;
         if (message.type === 'terminal:ready') {
           this.options.onStatus?.('connected');
         }
@@ -56,7 +68,8 @@ export class WebSocketClient {
           this.options.onError?.(message.message, 'session');
         }
         this.options.onMessage?.(message);
-      } catch {
+      } catch (error) {
+        console.warn('Invalid websocket frame', error);
         this.options.onError?.('Invalid websocket frame', 'transport');
         if (socket.readyState <= WebSocket.OPEN) {
           socket.close();

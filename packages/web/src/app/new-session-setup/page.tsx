@@ -94,7 +94,7 @@ export default function NewSessionSetupPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#08080f]">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#08080f]">
       <MobileScreenHeader
         onBack={() => router.back()}
         subtitle="Choose a program, workspace, and readable session name."

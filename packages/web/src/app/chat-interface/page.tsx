@@ -11,7 +11,7 @@ export default function ChatInterfacePage() {
 
   if (!session) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#08080f] px-6 text-center">
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-[#08080f] px-6 text-center">
         <p className="text-base leading-7 text-white/50">No session selected</p>
         <button
           className="interactive-focus-ring accent-gradient rounded-xl px-5 py-3 text-sm font-semibold text-white"

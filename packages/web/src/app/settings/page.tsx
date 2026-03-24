@@ -46,16 +46,16 @@ export default function SettingsPage() {
   }, [cliPrograms.length, sessionApi]);
 
   return (
-    <div
-      className="flex min-h-dvh flex-col bg-[#08080f]"
-      style={{ paddingTop: 'env(safe-area-inset-top, 44px)' }}
-    >
-      <header className="px-4 pb-4 pt-3">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#08080f]">
+      <header
+        className="shrink-0 px-4 pb-3"
+        style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 8px)' }}
+      >
         <div className="flex items-center gap-3">
-          <AppLogo size={34} />
+          <AppLogo size={30} />
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-white/92">Settings</h1>
-            <p className="text-sm leading-6 text-white/45">
+            <h1 className="text-[1.05rem] font-semibold tracking-tight text-white/92">Settings</h1>
+            <p className="max-w-[16rem] text-[0.78rem] leading-5 text-white/45">
               Codeject v{APP_VERSION}. Shortcuts for the screens you revisit most.
             </p>
           </div>
@@ -66,7 +66,10 @@ export default function SettingsPage() {
         id="main-content"
         className="flex-1 overflow-y-auto px-4"
         tabIndex={-1}
-        style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}
+        style={{
+          paddingBottom:
+            'calc(var(--app-bottom-nav-clearance, 96px) + env(safe-area-inset-bottom, 0px))',
+        }}
       >
         <SettingsGroup title="Preferences">
           <SettingsItem

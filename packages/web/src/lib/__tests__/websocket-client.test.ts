@@ -43,7 +43,7 @@ class MockWebSocket {
     this.emit('error');
   }
 
-  emitMessage(message: ServerWebSocketMessage | string) {
+  emitMessage(message: ServerWebSocketMessage | Record<string, unknown> | string) {
     const data = typeof message === 'string' ? message : JSON.stringify(message);
     this.emit('message', { data });
   }
@@ -76,11 +76,13 @@ describe('WebSocketClient', () => {
   beforeEach(() => {
     MockWebSocket.instances = [];
     vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.stubGlobal('WebSocket', MockWebSocket);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -159,6 +161,30 @@ describe('WebSocketClient', () => {
 
     expect(onError).toHaveBeenCalledWith('Invalid websocket frame', 'transport');
     expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats invalid structured websocket frames as transport failures', () => {
+    const onError = vi.fn();
+    const onMessage = vi.fn();
+    const onStatus = vi.fn();
+    const client = new WebSocketClient('ws://example.test/ws/session-1', {
+      onError,
+      onMessage,
+      onStatus,
+    });
+
+    client.connect();
+    MockWebSocket.instances[0].emitOpen();
+    MockWebSocket.instances[0].emitMessage({
+      status: 'bogus',
+      type: 'terminal:status',
+    });
+
+    expect(onError).toHaveBeenCalledWith('Invalid websocket frame', 'transport');
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(MockWebSocket.instances[0].readyState).toBe(MockWebSocket.CLOSED);
+    expect(onStatus).toHaveBeenCalledWith('disconnected');
+    expect(console.warn).toHaveBeenCalledTimes(1);
   });
 
   it('classifies terminal errors as session errors', () => {

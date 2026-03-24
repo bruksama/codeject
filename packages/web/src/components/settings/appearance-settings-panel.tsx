@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Palette, Type } from 'lucide-react';
+import { NotificationSettingsCard } from '@/components/settings/notification-settings-card';
 import SettingsGroup from '@/components/ui/SettingsGroup';
 import { useAppStore } from '@/stores/useAppStore';
 import { selectSettings, selectUpdateSettings } from '@/stores/use-app-store-selectors';
@@ -105,6 +106,12 @@ export function AppearanceSettingsPanel() {
               </button>
             );
           })}
+        </div>
+      </SettingsGroup>
+
+      <SettingsGroup title="Attention Alerts">
+        <div className="p-4">
+          <NotificationSettingsCard />
         </div>
       </SettingsGroup>
     </div>

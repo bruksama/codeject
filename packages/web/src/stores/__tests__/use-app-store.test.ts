@@ -7,6 +7,7 @@ const STORAGE_KEY = 'codeject-storage';
 const defaultSettings = {
   accentColor: '#7c3aed',
   fontSize: 'medium' as const,
+  notifications: false,
   remoteAccess: {
     autoStart: false,
     authKey: '',
@@ -65,11 +66,13 @@ describe('useAppStore', () => {
     useAppStore.getState().updateSettings({
       accentColor: '#1d4ed8',
       fontSize: 'large',
+      notifications: true,
     });
 
     const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
     expect(persisted.state.settings.fontSize).toBe('large');
     expect(persisted.state.settings.accentColor).toBe('#1d4ed8');
+    expect(persisted.state.settings.notifications).toBe(true);
   });
 
   it('merges remote access updates without dropping existing settings', () => {
@@ -91,11 +94,48 @@ describe('useAppStore', () => {
     useAppStore.getState().updateSettings({
       accentColor: '#f97316',
       fontSize: 'small',
+      notifications: true,
     });
 
     useAppStore.getState().resetSettings();
 
     expect(useAppStore.getState().settings).toEqual(defaultSettings);
+  });
+
+  it('merges legacy persisted settings with the new notifications default', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          activeSessionId: null,
+          settings: {
+            accentColor: '#1d4ed8',
+            fontSize: 'large',
+            remoteAccess: {
+              enabled: true,
+              tunnelMode: 'quick',
+            },
+            theme: 'dark',
+          },
+        },
+        version: 0,
+      })
+    );
+
+    await useAppStore.persist.rehydrate();
+
+    expect(useAppStore.getState().settings).toMatchObject({
+      accentColor: '#1d4ed8',
+      fontSize: 'large',
+      notifications: false,
+      remoteAccess: {
+        autoStart: false,
+        authKey: '',
+        enabled: true,
+        tunnelMode: 'quick',
+        tunnelStatus: 'inactive',
+      },
+    });
   });
 
   it('keeps the active session when setSessions still contains it', () => {

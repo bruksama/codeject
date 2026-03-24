@@ -19,6 +19,14 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
 5. Nếu cần đọc transcript dễ hơn trên điện thoại:
    - Vào `Settings > Appearance > Font Size`.
    - Đổi sang mức lớn hơn hoặc nhỏ hơn; app nhớ lại theo từng trình duyệt.
+6. Nếu muốn rời tab nhưng vẫn biết lúc Claude cần bạn:
+   - Vào `Settings > Appearance > Notifications`.
+   - Bật permission cho browser hiện tại.
+   - Khi tab không còn focus, app có thể báo:
+     - lúc Claude cần approval / input
+     - lúc có final reply
+     - lúc session lỗi
+     - lúc session về `idle`
 
 ## 2. Quản lý nhiều session CLI song song
 
@@ -34,6 +42,9 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
    - Khi CLI cần phản hồi dạng confirm, numbered select, hoặc free-text, action card sẽ xuất hiện ngay trong transcript.
 4. Nếu một session có transcript dày hoặc chữ quá chật:
    - đổi `Settings > Appearance > Font Size` để scale toàn bộ UI chat cho thiết bị đó.
+5. Nếu bạn theo dõi song song nhưng không muốn dán mắt vào màn hình:
+   - bật `Settings > Appearance > Notifications` trên thiết bị đang dùng
+   - notification sẽ dedupe theo action / reply để tránh spam khi cùng một event bị lặp
 
 ## 3. Bật remote access qua Cloudflare Tunnel
 
@@ -50,21 +61,39 @@ Tài liệu này tổng hợp một số cách dùng Codeject trong thực tế.
 4. Sử dụng giao diện như trên desktop:
    - Xem danh sách session.
    - Vào từng session để điều khiển.
+5. Nếu muốn background monitor:
+   - bật `Settings > Appearance > Notifications` trên chính thiết bị remote đó
+   - để tab unfocused rồi chờ notification khi agent cần approval hoặc hoàn tất reply
+   - trên iPhone/iPad Safari, cần Add to Home Screen trước thì notification mới hoạt động
 
 Lưu ý bảo mật:
 
 - Chỉ chia sẻ URL cho những người được phép truy cập.
 - Bearer key không nằm trong QR; mỗi thiết bị cần được cấu hình key riêng.
 
-## 4. Khôi phục lại session đang chạy
+## 4. Theo dõi agent ở nền và quay lại đúng session
+
+1. Trong browser đang dùng, bật `Settings > Appearance > Notifications`.
+2. Rời tab hoặc khóa màn hình.
+3. Khi agent cần approval, trả lời xong, gặp lỗi, hoặc về `idle`, browser có thể phát notification nếu permission đã được cấp.
+4. Khi bấm notification:
+   - browser sẽ focus lại tab
+   - Codeject set active session tương ứng
+   - nếu đang ở route khác, app chuyển về `/chat-interface`
+
+Lưu ý:
+
+- notification chỉ bắn khi browser support `Notification`, permission là `granted`, và tab không focus
+- nếu user revoke permission ngoài app, trạng thái enabled cũ sẽ bị clear ở lần focus tiếp theo
+## 5. Khôi phục lại session đang chạy
 
 1. Mở Codeject trên trình duyệt.
 2. Vào màn hình danh sách session:
    - Tìm session bạn đã tạo trước đó (Codeject lưu xuống `~/.codeject/sessions`).
 3. Mở lại session:
    - Chat sẽ gắn lại vào runtime `tmux` tương ứng và action card sẽ xuất hiện lại khi CLI đang chờ input.
-
-## 5. Dừng và dọn dẹp
+   - Nếu session đang có action request chưa đổi state, Codeject vẫn có thể surface lại pending action đó sau reconnect / background attach.
+## 6. Dừng và dọn dẹp
 
 1. Khi không cần dùng nữa:
    - Dừng các session không còn cần thiết trong UI.

@@ -39,6 +39,7 @@ vi.mock('@/lib/websocket-client', () => ({
 const defaultSettings = {
   accentColor: '#7c3aed',
   fontSize: 'medium' as const,
+  notifications: false,
   remoteAccess: {
     autoStart: false,
     authKey: '',
@@ -85,7 +86,9 @@ function resetStore() {
 describe('useHybridSession', () => {
   beforeEach(() => {
     window.localStorage.clear();
-    resetStore();
+    act(() => {
+      resetStore();
+    });
     websocketHarness.connect.mockClear();
     websocketHarness.disconnect.mockClear();
     websocketHarness.reconnect.mockClear();
@@ -95,21 +98,25 @@ describe('useHybridSession', () => {
 
   afterEach(() => {
     window.localStorage.clear();
-    resetStore();
+    act(() => {
+      resetStore();
+    });
   });
 
-  it('keeps transport frame errors on the reconnect path', () => {
+  it('keeps transport frame errors on the reconnect path', async () => {
     const { result } = renderHook(() => useHybridSession('session-1'));
 
     expect(websocketHarness.connect).toHaveBeenCalledTimes(1);
 
-    act(() => {
+    await act(async () => {
       websocketHarness.options?.onStatus?.('connected');
+      await Promise.resolve();
     });
 
-    act(() => {
+    await act(async () => {
       websocketHarness.options?.onError?.('Invalid websocket frame', 'transport');
       websocketHarness.options?.onStatus?.('disconnected');
+      await Promise.resolve();
     });
 
     expect(result.current.status).toBe('disconnected');
@@ -117,16 +124,67 @@ describe('useHybridSession', () => {
     expect(useAppStore.getState().sessions[0]?.status).toBe('disconnected');
   });
 
-  it('surfaces session errors in the recovery state', () => {
+  it('surfaces session errors in the recovery state', async () => {
     const { result } = renderHook(() => useHybridSession('session-1'));
 
-    act(() => {
+    await act(async () => {
       websocketHarness.options?.onStatus?.('connected');
       websocketHarness.options?.onError?.('Terminal session is not active', 'session');
+      await Promise.resolve();
     });
 
     expect(result.current.status).toBe('error');
     expect(result.current.lastError).toBe('Terminal session is not active');
     expect(useAppStore.getState().sessions[0]?.status).toBe('error');
+  });
+
+  it('stores terminal snapshots from websocket frames', async () => {
+    const { result } = renderHook(() => useHybridSession('session-1'));
+
+    await act(async () => {
+      websocketHarness.options?.onMessage?.({
+        type: 'terminal:snapshot',
+        content: '$ pwd',
+        cols: 80,
+        rows: 24,
+        seq: 3,
+      });
+      await Promise.resolve();
+    });
+
+    expect(result.current.terminalSnapshot).toEqual({
+      content: '$ pwd',
+      cols: 80,
+      rows: 24,
+      seq: 3,
+    });
+  });
+
+  it('sends terminal input and special keys through the websocket client', async () => {
+    const { result } = renderHook(() => useHybridSession('session-1'));
+
+    await act(async () => {
+      websocketHarness.options?.onStatus?.('connected');
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      expect(result.current.sendTerminalKey('Tab')).toBe(true);
+      expect(result.current.sendTerminalInput('npm test')).toBe(true);
+      await Promise.resolve();
+    });
+
+    expect(websocketHarness.send).toHaveBeenNthCalledWith(1, {
+      key: 'Tab',
+      type: 'terminal:key',
+    });
+    expect(websocketHarness.send).toHaveBeenNthCalledWith(2, {
+      data: 'npm test',
+      type: 'terminal:input',
+    });
+    expect(websocketHarness.send).toHaveBeenNthCalledWith(3, {
+      key: 'Enter',
+      type: 'terminal:key',
+    });
   });
 });

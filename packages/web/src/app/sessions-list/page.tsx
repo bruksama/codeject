@@ -87,10 +87,7 @@ export default function SessionsListPage() {
   };
 
   return (
-    <div
-      className="flex min-h-dvh flex-col bg-[#08080f]"
-      style={{ paddingTop: 'env(safe-area-inset-top, 44px)' }}
-    >
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#08080f]">
       <SessionListHeader
         isRefreshing={isRefreshing}
         onClearSearch={() => setSearchQuery('')}
@@ -118,8 +115,8 @@ export default function SessionsListPage() {
                   size="sm"
                   variant="accent"
                 >
-                  <RefreshCcw size={15} />
-                  <span className="ml-2 text-xs font-semibold">Retry</span>
+                  <RefreshCcw className="shrink-0" size={15} />
+                  <span className="text-xs font-semibold">Retry</span>
                 </MobileActionButton>
               }
               message={loadError}

@@ -61,10 +61,21 @@ Trong màn hình `Settings`, phần `Appearance` hiện cho phép:
 
 - đổi `Font Size` giữa các mức nhỏ, vừa, lớn
 - đổi `Accent Color`
+- bật `Notifications` theo kiểu opt-in cho browser hiện tại
 
 `Font Size` áp dụng ngay khi bạn đổi và affect toàn bộ typography của app, gồm cả khoảng trống chat transcript/composer để bề mặt đọc theo đúng scale đã chọn.
 
-Các tùy chọn này được lưu cục bộ trong trình duyệt hiện tại qua browser storage, nên mỗi trình duyệt hoặc thiết bị có thể giữ mức chữ riêng. Nếu cần đưa giao diện về mặc định, vào `Settings` và dùng `Reset All Settings` trong `Danger Zone`.
+Các tùy chọn này được lưu cục bộ trong trình duyệt hiện tại qua browser storage, nên mỗi trình duyệt hoặc thiết bị có thể giữ mức chữ, màu nhấn, và notification preference riêng.
+
+Với `Notifications`:
+
+- mặc định là **tắt**
+- chỉ xin permission khi bạn chủ động bật
+- nếu browser không support hoặc user bấm deny, toggle sẽ tự quay về off
+- nếu bạn revoke permission ngoài app, Codeject sẽ tự clear trạng thái enabled cũ khi app focus/visible lại
+- trên iPhone/iPad Safari, browser notification chỉ hoạt động sau khi thêm app vào Home Screen
+
+Nếu cần đưa giao diện local về mặc định, vào `Settings` và dùng `Reset Local Settings`.
 
 ## Remote access (tùy chọn)
 
@@ -82,6 +93,7 @@ Nếu host đã cài `cloudflared`, bạn có thể bật remote access để tr
   - Request **không local** bắt buộc phải gửi `Authorization: Bearer <key>`.
   - QR chỉ chứa public URL, **không chứa secret**.
   - `Auto-start` chỉ áp dụng cho `Named`; quick tunnel vẫn phải start thủ công.
+  - Notification over tunnel vẫn phụ thuộc browser support; trên iPhone/iPad Safari vẫn cần Add to Home Screen trước.
 
 Chi tiết thêm xem trong `docs/deployment-guide.md` và `docs/usage-recipes.md`.
 

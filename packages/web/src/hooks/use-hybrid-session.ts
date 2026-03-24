@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import type { ServerWebSocketMessage } from '@codeject/shared';
 import {
   type ChatState,
   type ConnectionStatus,
   type Message,
   type SurfaceRequirement,
+  type TerminalKey,
+  type TerminalSnapshot,
 } from '@/types';
 import { getWebSocketUrl } from '@/lib/api-client';
 import { WebSocketClient } from '@/lib/websocket-client';
@@ -31,10 +34,15 @@ interface HybridState {
   submittingActionId: string | null;
   status: ConnectionStatus;
   surfaceRequirement: SurfaceRequirement;
+  terminalSnapshot?: TerminalSnapshot;
   reconnectAttempts: number;
 }
 
-export function useHybridSession(sessionId: string | undefined) {
+interface UseHybridSessionOptions {
+  onMessage?: (message: ServerWebSocketMessage) => void;
+}
+
+export function useHybridSession(sessionId: string | undefined, options?: UseHybridSessionOptions) {
   const [state, setState] = useState<HybridState>({
     lastError: null,
     hasConnected: false,
@@ -76,6 +84,128 @@ export function useHybridSession(sessionId: string | undefined) {
     }));
     updateSession(sessionId, { status });
   });
+  const handleMessage = useEffectEvent((message: ServerWebSocketMessage) => {
+    options?.onMessage?.(message);
+
+    switch (message.type) {
+      case 'chat:bootstrap': {
+        const nextChatState = normalizeChatState(message.chatState);
+        setState((current) => ({
+          ...current,
+          chatState: nextChatState,
+          submittingActionId: reconcileSubmittingActionId(
+            current.submittingActionId,
+            nextChatState,
+            current.surfaceRequirement,
+            current.status
+          ),
+        }));
+        updateSession(sessionId!, {
+          chatState: nextChatState,
+          messages: message.messages.map(normalizeMessage),
+        });
+        return;
+      }
+      case 'chat:message':
+        setState((current) => {
+          const optimisticPrompt = current.optimisticPrompt;
+          if (!optimisticPrompt) {
+            return current;
+          }
+
+          const acknowledgedUser =
+            optimisticPrompt.acknowledgedUser ||
+            (message.message.role === 'user' &&
+              message.message.content.trim() === optimisticPrompt.prompt);
+          const acknowledgedAssistant =
+            optimisticPrompt.acknowledgedAssistant ||
+            (message.message.role === 'assistant' &&
+              message.message.isStreaming === true &&
+              !message.message.content.trim());
+
+          if (acknowledgedUser && acknowledgedAssistant) {
+            return { ...current, optimisticPrompt: undefined };
+          }
+
+          return {
+            ...current,
+            optimisticPrompt: {
+              ...optimisticPrompt,
+              acknowledgedAssistant,
+              acknowledgedUser,
+            },
+          };
+        });
+        addMessage(sessionId!, normalizeMessage(message.message));
+        return;
+      case 'chat:update':
+        setState((current) => {
+          if (!current.optimisticPrompt || !message.content.trim()) {
+            return current;
+          }
+
+          return { ...current, optimisticPrompt: undefined };
+        });
+        updateMessage(sessionId!, message.messageId, {
+          content: message.content,
+          isStreaming: message.isStreaming,
+        });
+        return;
+      case 'surface:update': {
+        const nextChatState = normalizeChatState(message.chatState);
+        setState((current) => ({
+          ...current,
+          chatState: nextChatState,
+          submittingActionId: reconcileSubmittingActionId(
+            current.submittingActionId,
+            nextChatState,
+            message.requirement,
+            current.status
+          ),
+          surfaceRequirement: message.requirement,
+        }));
+        updateSession(sessionId!, {
+          chatState: nextChatState,
+          surfaceRequirement: message.requirement,
+        });
+        return;
+      }
+      case 'terminal:ready': {
+        const nextChatState = normalizeChatState(message.chatState);
+        handleStatus(message.status);
+        setState((current) => ({
+          ...current,
+          chatState: nextChatState,
+          submittingActionId: reconcileSubmittingActionId(
+            current.submittingActionId,
+            nextChatState,
+            message.surfaceRequirement,
+            message.status
+          ),
+          surfaceRequirement: message.surfaceRequirement,
+        }));
+        updateSession(sessionId!, {
+          chatState: nextChatState,
+          surfaceRequirement: message.surfaceRequirement,
+          terminal: normalizeTerminalRuntime(message.terminal),
+        });
+        return;
+      }
+      case 'terminal:snapshot':
+        setState((current) => ({
+          ...current,
+          terminalSnapshot: {
+            content: message.content,
+            cols: message.cols,
+            rows: message.rows,
+            seq: message.seq,
+          },
+        }));
+        return;
+      default:
+        return;
+    }
+  });
 
   useEffect(() => {
     if (!sessionId) return;
@@ -98,115 +228,7 @@ export function useHybridSession(sessionId: string | undefined) {
         }));
         updateSession(sessionId, { status: 'error' });
       },
-      onMessage: (message) => {
-        switch (message.type) {
-          case 'chat:bootstrap': {
-            const nextChatState = normalizeChatState(message.chatState);
-            setState((current) => ({
-              ...current,
-              chatState: nextChatState,
-              submittingActionId: reconcileSubmittingActionId(
-                current.submittingActionId,
-                nextChatState,
-                current.surfaceRequirement,
-                current.status
-              ),
-            }));
-            updateSession(sessionId, {
-              chatState: nextChatState,
-              messages: message.messages.map(normalizeMessage),
-            });
-            return;
-          }
-          case 'chat:message':
-            setState((current) => {
-              const optimisticPrompt = current.optimisticPrompt;
-              if (!optimisticPrompt) {
-                return current;
-              }
-
-              const acknowledgedUser =
-                optimisticPrompt.acknowledgedUser ||
-                (message.message.role === 'user' &&
-                  message.message.content.trim() === optimisticPrompt.prompt);
-              const acknowledgedAssistant =
-                optimisticPrompt.acknowledgedAssistant ||
-                (message.message.role === 'assistant' &&
-                  message.message.isStreaming === true &&
-                  !message.message.content.trim());
-
-              if (acknowledgedUser && acknowledgedAssistant) {
-                return { ...current, optimisticPrompt: undefined };
-              }
-
-              return {
-                ...current,
-                optimisticPrompt: {
-                  ...optimisticPrompt,
-                  acknowledgedAssistant,
-                  acknowledgedUser,
-                },
-              };
-            });
-            addMessage(sessionId, normalizeMessage(message.message));
-            return;
-          case 'chat:update':
-            setState((current) => {
-              if (!current.optimisticPrompt || !message.content.trim()) {
-                return current;
-              }
-
-              return { ...current, optimisticPrompt: undefined };
-            });
-            updateMessage(sessionId, message.messageId, {
-              content: message.content,
-              isStreaming: message.isStreaming,
-            });
-            return;
-          case 'surface:update': {
-            const nextChatState = normalizeChatState(message.chatState);
-            setState((current) => ({
-              ...current,
-              chatState: nextChatState,
-              submittingActionId: reconcileSubmittingActionId(
-                current.submittingActionId,
-                nextChatState,
-                message.requirement,
-                current.status
-              ),
-              surfaceRequirement: message.requirement,
-            }));
-            updateSession(sessionId, {
-              chatState: nextChatState,
-              surfaceRequirement: message.requirement,
-            });
-            return;
-          }
-          case 'terminal:ready': {
-            const nextChatState = normalizeChatState(message.chatState);
-            handleStatus(message.status);
-            setState((current) => ({
-              ...current,
-              chatState: nextChatState,
-              submittingActionId: reconcileSubmittingActionId(
-                current.submittingActionId,
-                nextChatState,
-                message.surfaceRequirement,
-                message.status
-              ),
-              surfaceRequirement: message.surfaceRequirement,
-            }));
-            updateSession(sessionId, {
-              chatState: nextChatState,
-              surfaceRequirement: message.surfaceRequirement,
-              terminal: normalizeTerminalRuntime(message.terminal),
-            });
-            return;
-          }
-          default:
-            return;
-        }
-      },
+      onMessage: handleMessage,
       onReconnectAttempt: (attempt) => {
         setState((current) => ({
           ...current,
@@ -297,7 +319,22 @@ export function useHybridSession(sessionId: string | undefined) {
       }));
       return true;
     },
+    sendTerminalInput(text: string) {
+      if (state.status !== 'connected') return false;
+
+      if (text.length > 0) {
+        clientRef.current?.send({ data: text, type: 'terminal:input' });
+      }
+      clientRef.current?.send({ key: 'Enter', type: 'terminal:key' });
+      return true;
+    },
+    sendTerminalKey(key: TerminalKey) {
+      if (state.status !== 'connected') return false;
+      clientRef.current?.send({ key, type: 'terminal:key' });
+      return true;
+    },
     submittingActionId: state.submittingActionId,
     surfaceRequirement: state.surfaceRequirement,
+    terminalSnapshot: state.terminalSnapshot,
   };
 }

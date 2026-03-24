@@ -30,6 +30,7 @@ const defaultState = {
       tunnelUrl: undefined,
     },
     theme: 'dark' as const,
+    notifications: false,
   },
 };
 
@@ -136,6 +137,21 @@ export const useAppStore = create<StoreState>()(
         }),
     }),
     {
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState as Partial<StoreState> | undefined) ?? {};
+        return {
+          ...currentState,
+          ...persisted,
+          settings: {
+            ...currentState.settings,
+            ...persisted.settings,
+            remoteAccess: {
+              ...currentState.settings.remoteAccess,
+              ...persisted.settings?.remoteAccess,
+            },
+          },
+        };
+      },
       name: 'codeject-storage',
       partialize: (state) => ({
         activeSessionId: state.activeSessionId,

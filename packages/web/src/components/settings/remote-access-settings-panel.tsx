@@ -222,7 +222,7 @@ export function RemoteAccessSettingsPanel() {
                 variant="accent"
               >
                 <Check size={15} />
-                <span className="ml-2 text-xs font-semibold">
+                <span className="text-xs font-semibold">
                   {remote.isSavingTunnelConfig ? 'Saving…' : 'Save named tunnel'}
                 </span>
               </MobileActionButton>
@@ -243,7 +243,7 @@ export function RemoteAccessSettingsPanel() {
                 variant="accent"
               >
                 <Check size={15} />
-                <span className="ml-2 text-xs font-semibold">
+                <span className="text-xs font-semibold">
                   {remote.isSavingTunnelConfig ? 'Saving…' : 'Use quick tunnel'}
                 </span>
               </MobileActionButton>
@@ -259,7 +259,7 @@ export function RemoteAccessSettingsPanel() {
             variant="accent"
           >
             <Play size={15} />
-            <span className="ml-2 text-sm font-semibold">
+            <span className="text-sm font-semibold">
               {remote.isTunnelAction === 'start' ? 'Starting…' : 'Start'}
             </span>
           </MobileActionButton>
@@ -269,7 +269,7 @@ export function RemoteAccessSettingsPanel() {
             onClick={() => void remote.handleTunnelAction('stop')}
           >
             <Square size={15} />
-            <span className="ml-2 text-sm font-semibold">
+            <span className="text-sm font-semibold">
               {remote.isTunnelAction === 'stop' ? 'Stopping…' : 'Stop'}
             </span>
           </MobileActionButton>
@@ -279,7 +279,7 @@ export function RemoteAccessSettingsPanel() {
             onClick={() => void remote.handleTunnelAction('restart')}
           >
             <RefreshCw size={15} />
-            <span className="ml-2 text-sm font-semibold">
+            <span className="text-sm font-semibold">
               {remote.isTunnelAction === 'restart' ? 'Restarting…' : 'Restart'}
             </span>
           </MobileActionButton>
@@ -318,7 +318,7 @@ export function RemoteAccessSettingsPanel() {
               size="sm"
             >
               <Copy size={15} />
-              <span className="ml-2 text-xs font-semibold">Copy URL</span>
+              <span className="text-xs font-semibold">Copy URL</span>
             </MobileActionButton>
             <MobileActionButton
               disabled={!remote.tunnelUrl}
@@ -327,7 +327,7 @@ export function RemoteAccessSettingsPanel() {
               size="sm"
             >
               <Wifi size={15} />
-              <span className="ml-2 text-xs font-semibold">Show QR</span>
+              <span className="text-xs font-semibold">Show QR</span>
             </MobileActionButton>
           </div>
         </div>
@@ -353,7 +353,7 @@ export function RemoteAccessSettingsPanel() {
               variant="accent"
             >
               <RefreshCw size={15} />
-              <span className="ml-2 text-xs font-semibold">
+              <span className="text-xs font-semibold">
                 {remote.isRotatingKey ? 'Rotating…' : 'Rotate'}
               </span>
             </MobileActionButton>

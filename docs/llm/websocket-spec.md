@@ -5,6 +5,8 @@ Single WebSocket endpoint per session:
 - URL: `/ws/:sessionId`
 - Auth: local clients may connect without a token; non-local clients must send `?token=<apiKey>` in the WebSocket URL.
 - Transport: text JSON frames. Messages are flat objects keyed directly on the frame, not a nested `{ type, payload }` envelope.
+- Runtime validation: both sides validate frames against shared Zod schemas exported from `@codeject/shared`.
+- Client recovery: if a server frame is valid JSON but fails schema validation, the web client treats it as a transport failure, closes the socket, and reconnects instead of silently continuing with corrupted state.
 
 ## Frame shapes
 
@@ -12,10 +14,11 @@ Client frames:
 
 - `{"type":"chat:prompt","content":"..."}`
 - `{"type":"terminal:input","data":"..."}`
-- `{"type":"terminal:key","key":"Enter"}` or `{"type":"terminal:key","key":"Escape"}`
+- `{"type":"terminal:key","key":"Enter"}` plus expanded keys such as `Escape`, `Tab`, `Up`, `Down`, `Left`, `Right`, `BSpace`, `DC`, `C-c`, `C-d`, `C-z`, `C-l`
 
 Server frames:
 
+- `{"type":"terminal:snapshot","content":"...","cols":120,"rows":32,"seq":7}`
 - `{"type":"terminal:ready","sessionId":"...","status":"...","surfaceMode":"chat","surfaceRequirement":"...","chatState":{...},"terminal":{...}}`
 - `{"type":"chat:bootstrap","messages":[...],"chatState":{...}}`
 - `{"type":"chat:message","message":{...}}`
@@ -26,6 +29,7 @@ Server frames:
 
 Typical connect sequence:
 
+- `terminal:snapshot`
 - `terminal:ready`
 - `chat:bootstrap`
 
@@ -36,7 +40,7 @@ Typical connect sequence:
 - `terminal:input`
   - Purpose: send text input to the tmux-backed CLI runtime.
 - `terminal:key`
-  - Purpose: send supported special keys (`Enter`, `Escape`) for action submission or interrupt.
+  - Purpose: send supported special keys for action submission, interrupt, menu navigation, and common control combos.
 
 ## Server → Client events
 
@@ -57,8 +61,10 @@ Typical connect sequence:
   - Notes: `chatState.actionRequest` may be `confirm`, `single-select`, or `free-input`; clients should treat the action as complete only when the action id changes, disappears, or the connection drops.
 - `terminal:ready`
   - Purpose: signal that the tmux-backed session is ready and share runtime metadata.
+- `terminal:snapshot`
+  - Purpose: mirror the latest tmux pane capture so the client terminal tab can render a read-only terminal view.
 - `terminal:status`
   - Purpose: send status information about the tmux-backed runtime.
 - `terminal:error`
   - Purpose: report runtime or action-submission errors.
-  - Also used for invalid JSON frames or unsupported message types.
+  - Also used for invalid client frames or unsupported message types.

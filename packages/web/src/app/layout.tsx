@@ -3,6 +3,7 @@ import '@/styles/tailwind.css';
 import { Toaster } from 'sonner';
 import AccentThemeSync from '@/components/ui/accent-theme-sync';
 import FontSizeThemeSync from '@/components/ui/font-size-theme-sync';
+import NotificationPermissionSync from '@/components/ui/notification-permission-sync';
 import SkipToContentLink from '@/components/ui/skip-to-content-link';
 import { defaultFontSizeConfig, fontSizeScale } from '@/lib/font-size-scale';
 
@@ -15,7 +16,9 @@ const FONT_SIZE_INIT_SCRIPT = `
     const scale = Number(config.scale) || 1;
     root.style.setProperty('--app-font-size', config.size);
     root.style.setProperty('--app-font-scale', config.scale);
+    root.style.setProperty('--app-bottom-nav-clearance', Math.round(96 * scale) + 'px');
     root.style.setProperty('--session-list-bottom-clearance', Math.round(104 * scale) + 'px');
+    root.style.setProperty('--chat-command-menu-clearance', Math.round(320 * scale) + 'px');
   };
 
   try {
@@ -60,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ background: '#08080f' }}>
         <AccentThemeSync />
         <FontSizeThemeSync />
+        <NotificationPermissionSync />
         <SkipToContentLink />
         <div>{children}</div>
         <Toaster

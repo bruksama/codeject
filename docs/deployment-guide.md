@@ -16,6 +16,7 @@ Lệnh cơ bản:
 - `npm run lint`
 - `npm run type-check`
 - `npm run build`
+- `npm run test`
 
 Khi chạy `npm run dev` từ root:
 
@@ -48,6 +49,22 @@ Các biến runtime đang được code đọc trực tiếp:
 - `CODEJECT_TUNNEL_TARGET_URL`: override target URL mà tunnel public trỏ tới; mặc định là `http://127.0.0.1:<PORT>`
 - `NODE_ENV`: khi khác `production` thì server coi là development mode
 
+## Verification và hardening
+
+Verification tối thiểu trước khi ship thay đổi:
+
+- `npm run lint`
+- `npm run type-check`
+- `npm run build`
+- `npm run test`
+
+WebSocket boundary hiện có runtime validation dùng shared Zod schemas:
+
+- server validate incoming client frames trước khi xử lý command
+- frame client sai schema sẽ bị reject với `terminal:error` và không đi tiếp vào terminal execution
+- development mode của server assert outgoing server frame trước khi gửi
+- web client cũng validate incoming server frames; nếu frame là JSON hợp lệ nhưng sai schema, client coi đó là transport failure và reconnect thay vì tiếp tục với state hỏng
+
 ## Lưu trữ dữ liệu
 
 - `~/.codeject/config.json`
@@ -63,6 +80,8 @@ Remote access được cung cấp thông qua `cloudflared`.
 - REST request không local phải dùng `Authorization: Bearer <key>`.
 - WebSocket non-local dùng `?token=<key>` trong URL `/ws/:sessionId`.
 - QR chỉ chứa public URL, không chứa secret.
+- Browser notification không phụ thuộc tunnel, nhưng muốn dùng notification trên thiết bị remote vẫn cần browser support + permission thật ở thiết bị đó.
+- Trên iPhone/iPad Safari, notification yêu cầu app được Add to Home Screen trước.
 
 Hai mode được hỗ trợ:
 
@@ -100,3 +119,4 @@ Ghi chú:
 - Frontend static được phục vụ từ `packages/web/out`.
 - Mỗi session ứng dụng sở hữu một `tmux` runtime riêng.
 - API tunnel hiện có thêm `PUT /api/tunnel/auto-start` để bật/tắt named-tunnel auto-start từ UI.
+- `AppSettings.notifications` là preference frontend-only, lưu trong browser storage chứ không nằm trong `~/.codeject/config.json`.

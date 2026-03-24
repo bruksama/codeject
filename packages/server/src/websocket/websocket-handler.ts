@@ -2,8 +2,11 @@ import http from 'node:http';
 import type net from 'node:net';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import {
+  ClientWebSocketMessageSchema,
+  ServerWebSocketMessageSchema,
   type ClientWebSocketMessage,
   type ServerWebSocketMessage,
+  type TerminalSnapshot,
 } from '@codeject/shared';
 import { environment } from '../config/environment.js';
 import { isLocalSocket } from '../middleware/auth-middleware.js';
@@ -82,11 +85,16 @@ export function createWebSocketHandler({
   async function handleTerminalOutput(sessionId: string) {
     const snapshot = await terminalSessionManager.getSnapshot(sessionId);
     await sessionSupervisor.handleTerminalSnapshot(sessionId, snapshot);
+    broadcastTerminalSnapshot(sessionId, snapshot);
   }
 
-  async function refreshInitialSnapshot(sessionId: string) {
+  async function refreshInitialSnapshot(
+    sessionId: string,
+    sendFrame: (frame: ServerWebSocketMessage) => void
+  ) {
     const snapshot = await terminalSessionManager.getSnapshot(sessionId);
     await sessionSupervisor.handleTerminalSnapshot(sessionId, snapshot);
+    sendTerminalSnapshotFrame(sendFrame, snapshot);
   }
 
   function queueTerminalOutput(sessionId: string) {
@@ -190,11 +198,37 @@ export function createWebSocketHandler({
     }
   }
 
+  function broadcastTerminalSnapshot(sessionId: string, snapshot: TerminalSnapshot) {
+    broadcast(sessionId, {
+      type: 'terminal:snapshot',
+      content: snapshot.content,
+      cols: snapshot.cols,
+      rows: snapshot.rows,
+      seq: snapshot.seq,
+    });
+  }
+
+  function sendTerminalSnapshotFrame(
+    sendFrame: (frame: ServerWebSocketMessage) => void,
+    snapshot: TerminalSnapshot
+  ) {
+    sendFrame({
+      type: 'terminal:snapshot',
+      content: snapshot.content,
+      cols: snapshot.cols,
+      rows: snapshot.rows,
+      seq: snapshot.seq,
+    });
+  }
+
   function safeSend(socket: WebSocket, frame: ServerWebSocketMessage) {
     if (socket.readyState !== WebSocket.OPEN) {
       return;
     }
     try {
+      if (environment.isDevelopment) {
+        ServerWebSocketMessageSchema.parse(frame);
+      }
       socket.send(JSON.stringify(frame));
     } catch (error) {
       logger.warn('Failed to send websocket frame', error);
@@ -233,7 +267,7 @@ export function createWebSocketHandler({
 
       await terminalSessionManager.observe(session);
       client.observed = true;
-      await refreshInitialSnapshot(client.sessionId);
+      await refreshInitialSnapshot(client.sessionId, sendFrame);
       const nextSession = await sessionStore.getSession(client.sessionId);
       const bootstrap = await sessionSupervisor.getBootstrap(client.sessionId);
       await sessionSync.updateSessionStatus(client.sessionId, 'connected');
@@ -265,7 +299,15 @@ export function createWebSocketHandler({
     sendFrame: (frame: ServerWebSocketMessage) => void
   ) {
     try {
-      const frame = JSON.parse(toMessageText(payload)) as ClientWebSocketMessage;
+      const rawFrame = JSON.parse(toMessageText(payload));
+      const parsedFrame = ClientWebSocketMessageSchema.safeParse(rawFrame);
+      if (!parsedFrame.success) {
+        logger.warn('Ignoring invalid websocket frame', parsedFrame.error.flatten());
+        sendFrame({ type: 'terminal:error', message: 'Invalid websocket frame' });
+        return;
+      }
+
+      const frame: ClientWebSocketMessage = parsedFrame.data;
       try {
         switch (frame.type) {
           case 'chat:prompt': {

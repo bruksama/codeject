@@ -60,9 +60,9 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
       // List item
       if (line.startsWith('- ') || line.startsWith('* ')) {
         return (
-          <div key={i} className="flex gap-2">
+          <div key={i} className="flex min-w-0 gap-2">
             <span className="accent-text mt-0.5 flex-shrink-0">•</span>
-            <span>{renderInlineText(line.slice(2))}</span>
+            <span className="min-w-0">{renderInlineText(line.slice(2))}</span>
           </div>
         );
       }
@@ -71,11 +71,11 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
       const numMatch = line.match(/^(\d+)\. (.+)/);
       if (numMatch) {
         return (
-          <div key={i} className="flex gap-2">
+          <div key={i} className="flex min-w-0 gap-2">
             <span className="accent-text mt-0.5 w-4 flex-shrink-0 text-xs font-medium">
               {numMatch[1]}.
             </span>
-            <span>{renderInlineText(numMatch[2])}</span>
+            <span className="min-w-0">{renderInlineText(numMatch[2])}</span>
           </div>
         );
       }
@@ -85,9 +85,12 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
         if (line.includes('---')) return null;
         const cells = line.split('|').filter((c) => c.trim());
         return (
-          <div key={i} className="flex gap-2 text-xs border-b border-white/8 py-1">
+          <div key={i} className="flex min-w-0 gap-2 border-b border-white/8 py-1 text-xs">
             {cells.map((cell, ci) => (
-              <span key={ci} className={`flex-1 ${ci === 0 ? 'text-white/60' : 'text-white/80'}`}>
+              <span
+                key={ci}
+                className={`min-w-0 flex-1 ${ci === 0 ? 'text-white/60' : 'text-white/80'}`}
+              >
                 {renderInlineText(cell.trim())}
               </span>
             ))}
@@ -165,8 +168,8 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
       >
         {/* Bubble */}
         <div
-          className={`max-w-full overflow-hidden px-4 py-3 ${isUser ? 'bubble-user text-white' : 'bubble-assistant text-white/90'}`}
-          style={{ wordBreak: 'break-word' }}
+          className={`min-w-0 max-w-full overflow-hidden px-4 py-3 ${isUser ? 'bubble-user text-white' : 'bubble-assistant text-white/90'}`}
+          style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
         >
           {isUser ? (
             <p className="text-[0.95rem] leading-7">{message.content}</p>

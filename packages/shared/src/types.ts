@@ -1,20 +1,26 @@
-export type ConnectionStatus =
-  | 'connected'
-  | 'connecting'
-  | 'disconnected'
-  | 'error'
-  | 'idle'
-  | 'starting';
+import { z } from 'zod';
+import {
+  ChatActionOptionSchema,
+  ChatActionRequestSchema,
+  ChatActionSourceSchema,
+  ChatStatePhaseSchema,
+  ChatStateSchema,
+  ClientWebSocketMessageSchema,
+  ConnectionStatusSchema,
+  MessageRoleSchema,
+  MessageSchema,
+  ServerWebSocketMessageSchema,
+  SurfaceModeSchema,
+  SurfaceRequirementSchema,
+  TerminalKeySchema,
+  TerminalRuntimeSchema,
+} from './schemas';
 
-export type MessageRole = 'user' | 'assistant' | 'system';
+export type ConnectionStatus = z.infer<typeof ConnectionStatusSchema>;
 
-export interface Message {
-  id: string;
-  role: MessageRole;
-  content: string;
-  timestamp: Date;
-  isStreaming?: boolean;
-}
+export type MessageRole = z.infer<typeof MessageRoleSchema>;
+
+export type Message = z.infer<typeof MessageSchema>;
 
 export interface CliProgram {
   id: string;
@@ -24,30 +30,18 @@ export interface CliProgram {
   defaultWorkingDir?: string;
 }
 
-export type SurfaceMode = 'chat';
+export type SurfaceMode = z.infer<typeof SurfaceModeSchema>;
 
-export type SurfaceRequirement =
-  | 'chat-safe'
-  | 'terminal-available'
-  | 'terminal-required';
+export type SurfaceRequirement = z.infer<typeof SurfaceRequirementSchema>;
 
-export type ChatStatePhase =
-  | 'idle'
-  | 'awaiting-assistant'
-  | 'streaming-assistant'
-  | 'terminal-required';
+export type ChatStatePhase = z.infer<typeof ChatStatePhaseSchema>;
 
 export interface TerminalSize {
   cols: number;
   rows: number;
 }
 
-export interface TerminalRuntime {
-  lastSnapshotAt?: Date;
-  paneId?: string;
-  sessionName?: string;
-  windowId?: string;
-}
+export type TerminalRuntime = z.infer<typeof TerminalRuntimeSchema>;
 
 export interface TerminalSnapshot {
   cols: number;
@@ -60,45 +54,13 @@ export interface CliSessionOptions {
   terminal?: Partial<TerminalSize>;
 }
 
-export interface ChatState {
-  actionRequest?: ChatActionRequest;
-  lastAssistantMessageId?: string;
-  lastPrompt?: string;
-  phase: ChatStatePhase;
-  terminalRequiredReason?: string;
-  transcriptUpdatedAt?: Date;
-}
+export type ChatState = z.infer<typeof ChatStateSchema>;
 
-export type ChatActionSource = 'terminal' | 'transcript';
+export type ChatActionSource = z.infer<typeof ChatActionSourceSchema>;
 
-export type ChatActionRequest =
-  | {
-      id: string;
-      kind: 'confirm';
-      prompt: string;
-      options: [ChatActionOption, ChatActionOption];
-      source: ChatActionSource;
-    }
-  | {
-      id: string;
-      kind: 'single-select';
-      options: ChatActionOption[];
-      prompt: string;
-      source: ChatActionSource;
-    }
-  | {
-      context: string;
-      id: string;
-      kind: 'free-input';
-      prompt: string;
-      source: 'terminal';
-    };
+export type ChatActionRequest = z.infer<typeof ChatActionRequestSchema>;
 
-export interface ChatActionOption {
-  label: string;
-  submit: string;
-  value: string;
-}
+export type ChatActionOption = z.infer<typeof ChatActionOptionSchema>;
 
 export interface ProviderRuntime {
   provider: 'claude' | 'codex' | 'generic';
@@ -123,44 +85,9 @@ export interface Session {
   lastMessageAt: Date;
 }
 
-export type ClientWebSocketMessage =
-  | { type: 'chat:prompt'; content: string }
-  | { type: 'terminal:input'; data: string }
-  | { type: 'terminal:key'; key: TerminalKey };
-
-export type ServerWebSocketMessage =
-  | {
-      type: 'chat:bootstrap';
-      chatState?: ChatState;
-      messages: Message[];
-    }
-  | { type: 'chat:message'; message: Message }
-  | {
-      type: 'chat:update';
-      content: string;
-      isStreaming?: boolean;
-      messageId: string;
-    }
-  | {
-      type: 'surface:update';
-      chatState?: ChatState;
-      mode: SurfaceMode;
-      reason?: string;
-      requirement: SurfaceRequirement;
-    }
-  | { type: 'terminal:error'; message: string }
-  | {
-      type: 'terminal:ready';
-      chatState?: ChatState;
-      sessionId: string;
-      status: ConnectionStatus;
-      surfaceMode: SurfaceMode;
-      surfaceRequirement: SurfaceRequirement;
-      terminal?: TerminalRuntime;
-    }
-  | { type: 'terminal:status'; status: ConnectionStatus };
-
-export type TerminalKey = 'Enter' | 'Escape';
+export type TerminalKey = z.infer<typeof TerminalKeySchema>;
+export type ClientWebSocketMessage = z.infer<typeof ClientWebSocketMessageSchema>;
+export type ServerWebSocketMessage = z.infer<typeof ServerWebSocketMessageSchema>;
 
 export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
 
@@ -182,6 +109,7 @@ export interface AppSettings {
   accentColor: string;
   remoteAccess: RemoteAccessSettings;
   fontSize: 'small' | 'medium' | 'large';
+  notifications: boolean;
 }
 
 export interface AppState {

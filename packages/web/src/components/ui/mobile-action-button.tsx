@@ -39,7 +39,7 @@ export default function MobileActionButton({
   return (
     <button
       aria-label={label}
-      className={`interactive-focus-ring mobile-touch-target inline-flex items-center justify-center transition-all duration-150 active:scale-[0.97] ${sizeClassName[size]} ${variantClassName[variant]} ${className}`}
+      className={`interactive-focus-ring mobile-touch-target inline-flex shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap transition-all duration-150 active:scale-[0.97] [&>span]:truncate [&>svg]:shrink-0 ${sizeClassName[size]} ${variantClassName[variant]} ${className}`}
       type={type}
       {...props}
     >

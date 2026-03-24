@@ -3,21 +3,22 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { ChatComposer } from '@/components/chat/chat-composer';
 import { ConnectionStatusBanner } from '@/components/chat/connection-status-banner';
 import { ChatSessionErrorRecoveryBanner } from '@/components/chat/chat-session-error-recovery-banner';
-import { ChatTranscript } from '@/components/chat/chat-transcript';
+import { ChatSessionPane } from '@/components/chat/chat-session-pane';
 import { TerminalRequiredBanner } from '@/components/chat/terminal-required-banner';
+import { type SessionTab, SessionTabSwitcher } from '@/components/terminal/session-tab-switcher';
+import { TerminalTab } from '@/components/terminal/terminal-tab';
 import ConnectionBadge from '@/components/ui/ConnectionBadge';
 import MobileActionButton from '@/components/ui/mobile-action-button';
 import { MobileScreenHeader } from '@/components/ui/mobile-screen-header';
-import ProgramIcon from '@/components/ui/program-icon';
+import { useChatNotifications } from '@/hooks/use-chat-notifications';
 import { useHybridSession } from '@/hooks/use-hybrid-session';
 import { useSessionApi } from '@/hooks/use-session-api';
 import type { Session } from '@/types';
 
-const CHAT_COMPOSER_CLEARANCE = 'calc(58px * var(--app-font-scale))';
-const CHAT_COMPOSER_MENU_CLEARANCE = 'calc(350px * var(--app-font-scale))';
+const CHAT_TRANSCRIPT_BOTTOM_GAP = '16px';
+const CHAT_COMPOSER_MENU_CLEARANCE = 'var(--chat-command-menu-clearance, 320px)';
 
 interface ChatInterfaceSessionViewProps {
   onBackToSessions: () => void;
@@ -29,9 +30,11 @@ export function ChatInterfaceSessionView({
   session,
 }: ChatInterfaceSessionViewProps) {
   const sessionApi = useSessionApi();
+  const [activeTab, setActiveTab] = useState<SessionTab>('chat');
   const [chatDraft, setChatDraft] = useState('');
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
-  const hybrid = useHybridSession(session.id);
+  const { handleMessage: handleNotificationMessage } = useChatNotifications(session.id);
+  const hybrid = useHybridSession(session.id, { onMessage: handleNotificationMessage });
   const reconnectToastCycleRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +76,8 @@ export function ChatInterfaceSessionView({
 
   const showRecoveryBanner = hybrid.status === 'error' || Boolean(hybrid.lastError);
   const showTerminalRequired = hybrid.surfaceRequirement === 'terminal-required';
+  const showTerminalBadge = showTerminalRequired && !hybrid.chatState?.actionRequest;
+  const shouldShowTerminalBanner = showTerminalRequired && activeTab === 'chat';
   const isSubmittingAction =
     Boolean(hybrid.submittingActionId) &&
     hybrid.submittingActionId === hybrid.chatState?.actionRequest?.id;
@@ -90,14 +95,52 @@ export function ChatInterfaceSessionView({
     return didSubmit;
   };
 
+  const handleTerminalInput = (value: string) => {
+    const didSend = hybrid.sendTerminalInput(value);
+    if (!didSend) {
+      toast.error('Terminal input is unavailable');
+    }
+    return didSend;
+  };
+
+  const handleTerminalKey = (key: Parameters<typeof hybrid.sendTerminalKey>[0]) => {
+    if (!hybrid.sendTerminalKey(key)) {
+      toast.error('Terminal input is unavailable');
+    }
+  };
+
+  const handleTabChange = (tab: SessionTab) => {
+    setActiveTab(tab);
+  };
+
   return (
-    <div className="flex min-h-dvh flex-col bg-[#08080f]">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#08080f]">
       <MobileScreenHeader
+        bottomContent={
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <ConnectionBadge showLabel size="sm" status={hybrid.status} />
+              <div className="min-w-0 max-w-full flex-1 truncate rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.7rem] text-white/48">
+                {session.terminal?.sessionName ? session.terminal.sessionName : 'tmux starting'}
+              </div>
+            </div>
+            <SessionTabSwitcher
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              terminalBadge={showTerminalBadge}
+            />
+          </div>
+        }
         onBack={onBackToSessions}
         rightActions={
-          <MobileActionButton label="Reconnect session" onClick={handleReconnectSession} size="sm">
-            <RefreshCcw size={16} />
-            <span className="ml-2 text-xs font-semibold">Reconnect</span>
+          <MobileActionButton
+            className="max-w-[6.5rem]"
+            label="Reconnect session"
+            onClick={handleReconnectSession}
+            size="sm"
+          >
+            <RefreshCcw className="shrink-0" size={16} />
+            <span className="text-xs font-semibold">Reconnect</span>
           </MobileActionButton>
         }
         subtitle={`${session.cliProgram.name} · ${session.workspacePath}`}
@@ -105,22 +148,10 @@ export function ChatInterfaceSessionView({
       />
 
       <main
-        className="flex min-h-0 flex-1 flex-col gap-3 px-2.5 pb-3"
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-2.5 pb-2 pt-3"
         id="main-content"
         tabIndex={-1}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/8 bg-white/[0.04]">
-              <ProgramIcon alt={session.cliProgram.name} icon={session.cliProgram.icon} size={16} />
-            </div>
-            <ConnectionBadge showLabel size="sm" status={hybrid.status} />
-          </div>
-          <div className="max-w-[68vw] truncate rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.6875rem] text-white/48">
-            {session.terminal?.sessionName ? session.terminal.sessionName : 'tmux starting'}
-          </div>
-        </div>
-
         {showRecoveryBanner ? (
           <ChatSessionErrorRecoveryBanner
             message={hybrid.lastError}
@@ -129,8 +160,11 @@ export function ChatInterfaceSessionView({
           />
         ) : null}
 
-        {showTerminalRequired ? (
-          <TerminalRequiredBanner reason={hybrid.chatState?.terminalRequiredReason} />
+        {shouldShowTerminalBanner ? (
+          <TerminalRequiredBanner
+            reason={hybrid.chatState?.terminalRequiredReason}
+            showTerminalTabHint={showTerminalBadge}
+          />
         ) : null}
 
         {!showRecoveryBanner ? (
@@ -143,39 +177,46 @@ export function ChatInterfaceSessionView({
           />
         ) : null}
 
-        <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] px-3 pb-2 pt-3">
-          <div className="h-full min-h-0 flex-1">
-            <ChatTranscript
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03]">
+          <div className={activeTab === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+            <ChatSessionPane
               chatState={hybrid.chatState}
+              cliProgramId={session.cliProgram.id}
               composerClearance={
-                isCommandMenuOpen ? CHAT_COMPOSER_MENU_CLEARANCE : CHAT_COMPOSER_CLEARANCE
+                isCommandMenuOpen ? CHAT_COMPOSER_MENU_CLEARANCE : CHAT_TRANSCRIPT_BOTTOM_GAP
               }
+              disabled={hybrid.status === 'error'}
+              errorMessage={showRecoveryBanner ? hybrid.lastError : null}
+              isBusy={isHandlingPrompt}
+              isVisible={activeTab === 'chat'}
               isSubmittingAction={isSubmittingAction}
               messages={hybrid.messages}
+              onInterrupt={() => hybrid.interruptPrompt()}
               onSubmitAction={handleActionSubmit}
+              onSubmitPrompt={() => {
+                if (!hybrid.sendPrompt(chatDraft)) {
+                  toast.error('Unable to send chat prompt');
+                  return;
+                }
+                setChatDraft('');
+              }}
+              onSuggestionMenuVisibilityChange={setIsCommandMenuOpen}
+              onValueChange={setChatDraft}
               programIcon={session.cliProgram.icon}
               programName={session.cliProgram.name}
               sessionId={session.id}
+              value={chatDraft}
             />
           </div>
-          <ChatComposer
-            cliProgramId={session.cliProgram.id}
-            className="absolute inset-x-3 bottom-3 z-20"
-            disabled={hybrid.status === 'error'}
-            errorMessage={showRecoveryBanner ? hybrid.lastError : null}
-            isBusy={isHandlingPrompt}
-            onSuggestionMenuVisibilityChange={setIsCommandMenuOpen}
-            onInterrupt={() => hybrid.interruptPrompt()}
-            onSubmit={() => {
-              if (!hybrid.sendPrompt(chatDraft)) {
-                toast.error('Unable to send chat prompt');
-                return;
-              }
-              setChatDraft('');
-            }}
-            onValueChange={setChatDraft}
-            value={chatDraft}
-          />
+          <div className={activeTab === 'terminal' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+            <TerminalTab
+              disabled={hybrid.status !== 'connected'}
+              isActive={activeTab === 'terminal'}
+              onSendInput={handleTerminalInput}
+              onSendKey={handleTerminalKey}
+              snapshot={hybrid.terminalSnapshot}
+            />
+          </div>
         </div>
       </main>
     </div>
