@@ -13,7 +13,12 @@ const EXPLICIT_ENTER_PATTERN = /\b(press|hit)\s+(enter|return)\b/i;
 const GENERIC_PROMPT_START_PATTERN = /^(enter|type|paste|provide|reply|input)\b/i;
 const GENERIC_PROMPT_HINT_PATTERN =
   /\b(name|path|token|key|value|text|reply|message|input|answer|command|directory|folder|url|api)\b/i;
-const NON_INPUT_LABEL_PATTERN = /^(steps?|note|summary|error|output|result|response|warning)s?$/i;
+const NON_INPUT_LABEL_PATTERN =
+  /^(steps?|note|summary|error|output|result|response|warning|tip|status|model|mode|session|workspace|context|branch|provider|profile|assistant|user|system|current|latest|directory)s?$/i;
+const NON_INPUT_STATUS_PHRASE_PATTERN =
+  /^(current|working|active|latest)\s+(directory|workspace|branch|session|model|status)$/i;
+const CLAUSE_PUNCTUATION_PATTERN = /[.,;!]/;
+const NARRATIVE_PRONOUN_PATTERN = /\b(i|you|we|they|he|she|it)\b/i;
 const SHELL_PROMPT_PATTERN = /^(?:\$|#|>|❯|bruk@|current:)/i;
 const UNSUPPORTED_TERMINAL_REQUIRED_PATTERNS = [
   /\b(approve|approval required|confirm action|confirm execution|allow tool)\b/i,
@@ -242,24 +247,44 @@ function isGenericPromptCandidate(line: string) {
   if (/^[-*•]\s+/.test(line) || /^#{1,6}\s/.test(line)) return false;
   if (/^```/.test(line) || /^[\u2500-\u257f\s]+$/.test(line)) return false;
   if (/^(?:https?:\/\/|www\.)/i.test(line) || SHELL_PROMPT_PATTERN.test(line)) return false;
-  if (NON_INPUT_LABEL_PATTERN.test(line.replace(/[:?]\s*$/, ''))) return false;
+  if (isLikelyNonInputLabel(line)) return false;
 
-  return scoreGenericPromptCandidate(line) >= 3;
+  const wordCount = line.split(/\s+/).length;
+  const hasExplicitEnter = EXPLICIT_ENTER_PATTERN.test(line);
+  const hasHint = GENERIC_PROMPT_HINT_PATTERN.test(line);
+  const startsLikePrompt = GENERIC_PROMPT_START_PATTERN.test(line);
+  const endsWithColon = /:$/.test(line);
+  const endsWithQuestion = /\?$/.test(line);
+
+  if (CLAUSE_PUNCTUATION_PATTERN.test(line.replace(/[:?]\s*$/, '')) && !hasExplicitEnter) {
+    return false;
+  }
+
+  if (hasExplicitEnter) {
+    return true;
+  }
+
+  if (startsLikePrompt && wordCount <= 6) {
+    return true;
+  }
+
+  if (endsWithColon) {
+    return hasHint && wordCount <= 5;
+  }
+
+  if (endsWithQuestion) {
+    return hasHint && wordCount <= 4 && !NARRATIVE_PRONOUN_PATTERN.test(line);
+  }
+
+  return false;
 }
 
-function scoreGenericPromptCandidate(line: string) {
-  let score = 0;
-  const wordCount = line.split(/\s+/).length;
-
-  if (/:$/.test(line)) score += 3;
-  if (/\?$/.test(line)) score += 2;
-  if (EXPLICIT_ENTER_PATTERN.test(line)) score += 3;
-  if (GENERIC_PROMPT_START_PATTERN.test(line) && wordCount <= 6) score += 2;
-  if (GENERIC_PROMPT_HINT_PATTERN.test(line)) score += 1;
-  if (/[.!]\s*$/.test(line) && !EXPLICIT_ENTER_PATTERN.test(line)) score -= 2;
-  if (wordCount > 12 && !/[:?]\s*$/.test(line) && !EXPLICIT_ENTER_PATTERN.test(line)) score -= 2;
-
-  return score;
+function isLikelyNonInputLabel(line: string) {
+  const normalizedLabel = line.replace(/[:?]\s*$/, '').trim();
+  return (
+    NON_INPUT_LABEL_PATTERN.test(normalizedLabel) ||
+    NON_INPUT_STATUS_PHRASE_PATTERN.test(normalizedLabel)
+  );
 }
 
 function buildActionId(kind: string, seed: string) {

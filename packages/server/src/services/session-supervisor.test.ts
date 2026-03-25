@@ -73,6 +73,30 @@ test('SessionSupervisor keeps Codex on loading until a final transcript answer e
   assert.equal(next?.messages.at(-1)?.isStreaming, false);
 });
 
+test('SessionSupervisor ignores narrative terminal questions while Codex is still working', async () => {
+  const transcriptPath = await writeTempFile(
+    codexEntries([{ id: 'assistant-1', phase: 'commentary', text: 'Working...' }])
+  );
+  const session = createCodexSession(transcriptPath);
+  const store = new TestSessionStore();
+  await store.createSession(session);
+  const supervisor = new SessionSupervisor(store as unknown as SessionStore);
+
+  await supervisor.handleChatPrompt(session.id, 'Inspect the repo');
+  await supervisor.handleTerminalSnapshot(session.id, {
+    cols: 80,
+    content:
+      'Using ck:ask for an architecture/codebase assessment.\nI need you to inspect the current codebase and tell me which directory should I inspect first?',
+    rows: 24,
+    seq: 1,
+  });
+
+  const next = await store.getSession(session.id);
+  assert.equal(next?.surfaceRequirement, 'terminal-available');
+  assert.equal(next?.chatState?.actionRequest, undefined);
+  assert.equal(next?.chatState?.phase, 'awaiting-assistant');
+});
+
 test('SessionSupervisor removes an empty assistant placeholder when no final answer arrives', async () => {
   const transcriptPath = await writeTempFile(
     codexEntries([{ id: 'assistant-1', phase: 'commentary', text: 'Still working' }])

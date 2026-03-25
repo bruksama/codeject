@@ -4,6 +4,8 @@ import { expandHomePath } from '../adapters/base-cli-adapter.js';
 
 const execFileAsync = promisify(execFile);
 const SNAPSHOT_HISTORY_LINES = '-2000';
+const ANSI_ESCAPE_SEQUENCE_PATTERN =
+  /\u001B(?:\][^\u0007]*(?:\u0007|\u001B\\)|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])/g;
 
 export interface TmuxSessionTarget {
   paneId: string;
@@ -71,7 +73,7 @@ export class TmuxBridge {
     let sizeLine = '120\t32\t1';
     try {
       [{ stdout: content }, { stdout: sizeLine }] = await Promise.all([
-        this.run(['capture-pane', '-p', '-e', '-J', '-S', SNAPSHOT_HISTORY_LINES, '-t', paneId]),
+        this.run(['capture-pane', '-p', '-J', '-S', SNAPSHOT_HISTORY_LINES, '-t', paneId]),
         this.run(['display-message', '-p', '-t', paneId, '#{pane_width}\t#{pane_height}\t#{pane_dead}']),
       ]);
     } catch (error) {
@@ -82,7 +84,7 @@ export class TmuxBridge {
     const [colsText = '120', rowsText = '32', deadText = '0'] = sizeLine.trim().split('\t');
     return {
       cols: Number.parseInt(colsText, 10) || 120,
-      content,
+      content: stripAnsiEscapeSequences(content),
       dead: deadText === '1',
       rows: Number.parseInt(rowsText, 10) || 32,
     };
@@ -170,4 +172,8 @@ function parseTarget(stdout: string): TmuxSessionTarget {
     throw new Error('Failed to parse tmux target metadata');
   }
   return { paneId, sessionName, windowId };
+}
+
+function stripAnsiEscapeSequences(content: string) {
+  return content.replace(ANSI_ESCAPE_SEQUENCE_PATTERN, '');
 }
