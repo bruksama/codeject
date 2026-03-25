@@ -104,3 +104,4 @@
 - Local requests bypass auth; non-local REST and WebSocket connections both require the same API key, but transport it differently.
 - The terminal tab is still snapshot-based, so opaque arrow-key or full-screen TUIs are not first-class emulated terminals yet.
 - Root workspace verification now expects `npm test` to run both server `node:test` and web Vitest suites.
+

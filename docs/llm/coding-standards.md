@@ -41,8 +41,11 @@ This document summarizes the most important rules for AI coding agents working i
 - `docs/` is the source of truth for documentation.
 - When architecture or phase status changes, update:
   - `README.md`
-  - `docs/system-architecture.md`
-  - `docs/project-roadmap.md`
+  - `CHANGELOG.md`
+  - `docs/architecture.md`
+  - `docs/deployment.md`
+  - `docs/configuration.md`
+  - `docs/troubleshooting.md`
   - any directly affected docs
 - Human docs (VN) should be concise and readable.
 - LLM docs (EN) should be compact, structured, and token-efficient.

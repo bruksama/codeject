@@ -1,189 +1,99 @@
 # Codeject
 
-Giao diện web ưu tiên điện thoại để theo dõi và điều khiển các CLI coding assistant (Claude Code, Codex, shell, …) đang chạy trên máy local.
+Giao diện web ưu tiên điện thoại để theo dõi và điều khiển CLI coding assistant chạy local.
 
-## Codeject giải quyết vấn đề gì
+![Ảnh giao diện Codeject](./docs/assets/images/readme-landing.png)
 
-CLI coding assistant rất mạnh nhưng khó theo dõi trên điện thoại và khó quản lý khi có nhiều session dài đang chạy.
+## Vì sao dùng Codeject?
 
-Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local để bạn có thể:
+Session CLI dài rất khó theo dõi trên điện thoại và dễ rối khi chạy nhiều công cụ cùng lúc. Codeject giữ runtime trên chính máy của bạn nhưng cung cấp bề mặt web gọn để theo dõi, gửi prompt, và phản hồi approval. Khác biệt chính là luồng chat-first với action card an toàn, kèm terminal tab nhẹ khi bắt buộc phải thao tác trực tiếp.
 
-- Xem các session đang chạy từ trình duyệt trên điện thoại hoặc máy tính.
-- Gửi prompt nhanh qua chat surface.
-- Trả lời approval, lựa chọn, và prompt nhập liệu trực tiếp qua action card trong chat.
-- Truy cập từ xa qua Cloudflare Tunnel mà vẫn giữ runtime trên máy của chính bạn.
+## Tính năng
 
-## Tính năng chính
+- **Quản lý session:** Tạo, khôi phục, và xóa nhiều session CLI.
+- **Tương tác chat-first:** Gửi prompt, approve, chọn option, và nhập liệu ngay trong transcript.
+- **Tối ưu mobile:** Header/composer cố định, chỉ transcript cuộn, chỉnh cỡ chữ nhanh.
+- **Truy cập remote:** Hỗ trợ quick tunnel và named tunnel Cloudflare với auth theo thiết bị.
+- **An toàn runtime:** Validate frame WebSocket bằng Zod ở cả client và server.
+- **Theo dõi nền:** Notification trình duyệt tùy chọn cho action-needed, reply-ready, lỗi, và idle.
 
-- Tạo, lưu, khôi phục và xóa nhiều session CLI.
-- Chọn chương trình CLI như Claude Code, Codex hoặc generic shell cho từng session.
-- Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
-- Chat screen giờ giữ header và composer cố định; chỉ transcript cuộn như app chat thông thường để theo dõi session dài trên điện thoại dễ hơn.
-- Session header giờ gom runtime controls gọn hơn: reconnect icon-only ở hàng trên, còn hàng dưới giữ status badge, chip `tmux` truncate, và Chat/Terminal switcher icon-only để transcript có thêm vertical space.
-- Session view có thêm tab `Terminal` với snapshot terminal read-only, input bar, và virtual keyboard cho Tab/Esc/arrows/Ctrl combos khi action card không đủ.
-- `Settings > Appearance > Font Size` đổi cỡ chữ toàn app ngay lập tức, lưu theo từng trình duyệt, và scale shared shell spacing đủ an toàn để header/action/composer không lệch trên mobile.
-- `Settings > Appearance > Accent Color` đổi màu nhấn toàn app, cũng lưu theo từng trình duyệt.
-- `Settings > Appearance > Notifications` cho phép opt-in browser notification khi agent cần approval, trả lời xong, gặp lỗi, hoặc về `idle` khi tab không còn focus.
-- Settings giờ là một hub gọn hơn, tách `Appearance`, `Remote Access`, và `About` thành các màn hình riêng để dễ scan trên điện thoại.
-- Inline action cards cho confirm, select, và free-text input khi CLI chờ phản hồi.
-- Prompt dạng `Project name:`, `Paste token:`, `Enter path` cũng được recover thành free-input card trong chat.
-- Composer gợi ý lệnh ClaudeKit ổn định ngay khi token đầu tiên bắt đầu bằng `/` cho Claude session hoặc `$` cho Codex session.
-- Với `Claude Code` và `OpenAI Codex`, chat giữ loading cho tới khi transcript xác nhận final answer; commentary và tool-progress không render thành bubble assistant.
-- WebSocket frame ở client/server boundary được validate runtime bằng shared Zod schemas để mismatch hiện rõ hơn thay vì làm hỏng UI âm thầm.
-- Khi WebSocket chập chờn, chat có banner reconnect/disconnect, toast retry sau nhiều lần fail, và session list dùng status dot gọn hơn để thấy phiên nào đang sống.
-- Shared mobile guardrails đã bật lại browser zoom, thêm visible focus state, touch target tối thiểu 44x44, và reduced-motion fallback cho toàn app.
-- Lưu toàn bộ cấu hình và session dưới `~/.codeject` (hoặc `CODEJECT_HOME`).
-- Remote access thông qua Cloudflare Tunnel nếu host có `cloudflared`.
-- Hỗ trợ quick tunnel mặc định và named tunnel token-based cho domain riêng.
-- Named tunnel có thể bật auto-start khi server khởi động; quick tunnel vẫn giữ manual-only.
-- Mỗi thiết bị remote có thể lưu bearer key riêng trong browser để gọi REST/WebSocket sau khi mở public URL hoặc QR.
+## Chạy nhanh
 
-## Demo nhanh
-
-Ảnh chụp giao diện tạo session trong web app:
-
-![Codeject web app screenshot](./docs/assets/images/readme-landing.png)
-
-## Cài đặt và chạy nhanh
-
-Yêu cầu:
-
-- Node.js và npm tương thích với `packageManager`.
-- `tmux` đã được cài trên máy host.
-- `cloudflared` (tùy chọn) nếu muốn bật remote access.
-
-Các bước:
-
-1. Clone repository:
-   - `git clone <repo-url>`
-   - `cd codeject`
-2. Cài đặt dependencies:
-   - `npm install`
-3. Chạy ở chế độ phát triển:
-   - `npm run dev`
-   - Mở UI tại `http://localhost:4028`
-   - REST API và WebSocket server chạy tại `http://localhost:3500`
-
-Để chạy production local:
-
-1. Build toàn bộ workspace:
-   - `npm run build`
-2. Khởi động server:
-   - `npm start`
-3. Mở `http://localhost:3500`
-4. Server lắng nghe ở `PORT` hoặc `3500`.
-
-Kiểm tra nhanh sau khi sửa code:
-
-1. Chạy lint:
-   - `npm run lint`
-2. Chạy type-check:
-   - `npm run type-check`
-3. Chạy build:
-   - `npm run build`
-4. Chạy test toàn workspace:
-   - `npm test`
-
-`npm test` hiện chạy cả server test (`node:test`) và web test (`Vitest`).
-
-Chi tiết hơn xem `docs/getting-started.md`.
-
-## Cách sử dụng cơ bản
-
-1. Mở UI tại `http://localhost:4028` khi đang chạy dev, hoặc `http://localhost:3500` sau khi build + `npm start`.
-2. Tạo một session mới:
-   - Chọn chương trình CLI phù hợp.
-   - Lưu session để có thể khôi phục sau.
-3. Gửi prompt qua chat surface và quan sát trả lời.
-   - Với session Claude, bắt đầu token đầu bằng `/` để thấy gợi ý ClaudeKit command ổn định.
-   - Với session Codex, bắt đầu token đầu bằng `$` để thấy cùng bộ gợi ý đó theo prefix của Codex.
-   - Khi chọn gợi ý, composer chỉ thay token đầu và giữ nguyên phần prompt còn lại bạn đã gõ.
-4. Khi CLI cần approval, chọn option, hoặc nhập liệu:
-   - Trả lời ngay trong action card được render trong chat.
-   - Nếu CLI đang ở menu dùng arrow-key, multi-select, hoặc prompt không recover được thành card an toàn, chuyển sang tab `Terminal` để gõ trực tiếp.
-5. Nếu chat hơi chật hoặc quá lớn trên thiết bị hiện tại:
-   - Vào `Settings > Appearance > Font Size`.
-   - Thay đổi áp dụng ngay cho toàn bộ UI và được nhớ lại trên chính trình duyệt đó.
-6. Nếu muốn rời tab nhưng vẫn biết khi agent cần bạn:
-   - Vào `Settings > Appearance > Notifications`.
-   - Bật permission browser khi được hỏi.
-   - Trên iPhone/iPad Safari, cần thêm app vào Home Screen trước khi notification hoạt động.
-7. (Tùy chọn) Bật Cloudflare Tunnel để truy cập từ điện thoại khi không ngồi trước máy.
-   - Quick tunnel: zero-setup, URL tạm.
-   - Named tunnel: URL cố định trên domain Cloudflare của bạn.
-   - Named tunnel có thể bật auto-start sau khi đã lưu hostname + token.
-   - Trên thiết bị remote, dán bearer key vào `Settings > Remote Access > Device Auth` một lần để browser đó tự gửi cho REST/WebSocket.
-   - Nếu bearer key lưu trên thiết bị remote không còn hợp lệ, UI sẽ xóa trạng thái tunnel cũ trên browser đó và yêu cầu dán lại key.
-8. Nếu cần đổi các phần ít dùng hơn trong Settings:
-   - `Settings` chỉ còn là hub ngắn.
-   - Vào từng màn hình `Appearance`, `Remote Access`, hoặc `About` để chỉnh chi tiết.
-   - `Reset Local Settings` cũng xóa bearer key đã lưu trên browser hiện tại, nên thiết bị đó sẽ cần lưu lại key sau khi reset.
-
-Một số kịch bản sử dụng cụ thể nằm trong `docs/usage-recipes.md`.
-
-Giới hạn hiện tại:
-
-- Terminal tab hiện là snapshot read-only + input/virtual keyboard, chưa phải terminal emulator đầy đủ; opaque arrow-key UI hoặc full-screen TUI vẫn có thể cần thao tác thủ công.
-- `Claude Code` va `OpenAI Codex` hiện không stream token-by-token lên chat; phản hồi chỉ hiện khi transcript có final answer an toàn.
-- Gợi ý command chỉ áp dụng cho provider đã hỗ trợ (`Claude Code`, `OpenAI Codex`); provider khác giữ hành vi composer cũ.
-
-## Kiến trúc và công nghệ
-
-- Frontend: Next.js 16, React 19, Tailwind CSS 4, Zustand.
-- Frontend test: Vitest + React Testing Library cho store, WebSocket client, command suggestion, action-card flow, va terminal tab interactions.
-- Backend: Express 5, WebSocket, `tmux`, `cloudflared`.
-- Shared: TypeScript workspace package + shared Zod wire schemas.
-- Monorepo: npm workspaces + Turbo.
-
-Tổng quan kiến trúc:
-
-- Một process Node.js production:
-  - Phục vụ frontend static từ `packages/web/out`.
-  - Cung cấp REST API dưới `/api/*`.
-  - Cung cấp WebSocket dưới `/ws/:sessionId`.
-- Ở chế độ dev:
-  - Next.js dev server chạy trên `http://localhost:4028`.
-  - Express API/WebSocket server chạy trên `http://localhost:3500`.
-- Runtime terminal và session CLI được quản lý bằng `tmux`.
-- Dữ liệu cấu hình và session được lưu dưới `~/.codeject`.
-
-Chi tiết kiến trúc xem `docs/system-architecture.md` (VN) hoặc `docs/llm/architecture.md` (EN, rút gọn).
-
-## Cấu trúc thư mục
-
-```text
-codeject/
-├── packages/
-│   ├── web/       # UI mobile-first
-│   ├── server/    # Express + REST + WebSocket
-│   └── shared/    # Shared TypeScript types
-├── docs/          # Tài liệu cho con người đọc
-│   └── llm/       # Tài liệu rút gọn cho LLM
-├── package.json
-└── turbo.json
+```bash
+git clone <repo-url> && cd codeject
+npm install
+npm run dev
 ```
 
-## Trạng thái dự án
-
-- Ứng dụng đã sẵn sàng để sử dụng.
-- Đã hoàn thành: monorepo, frontend, backend, persistence, WebSocket, `tmux` runtime, remote tunnel.
-- Giai đoạn hiện tại: cleanup, ổn định hóa reconnect UX, tăng test coverage, và cập nhật tài liệu.
-
-Chi tiết roadmap xem `docs/project-roadmap.md`.
+- UI: `http://localhost:4028`
+- API + WebSocket: `http://localhost:3500`
 
 ## Tài liệu
 
-- Bắt đầu nhanh: `docs/getting-started.md`
-- Kiến trúc hệ thống: `docs/system-architecture.md`
-- Các kịch bản sử dụng: `docs/usage-recipes.md`
-- Hướng dẫn chạy và triển khai: `docs/deployment-guide.md`
-- Lộ trình dự án: `docs/project-roadmap.md`
-- Coding standards cho agent: `docs/llm/coding-standards.md`
+| Chủ đề | Tiếng Việt | English |
+|-------|------------|---------|
+| Bắt đầu nhanh | `docs/getting-started.md` | `docs/en/getting-started.md` |
+| Hướng dẫn sử dụng | `docs/usage-guide.md` | `docs/en/usage-guide.md` |
+| Kiến trúc | `docs/architecture.md` | `docs/en/architecture.md` |
+| Triển khai | `docs/deployment.md` | `docs/en/deployment.md` |
+| Cấu hình | `docs/configuration.md` | `docs/en/configuration.md` |
+| Xử lý sự cố | `docs/troubleshooting.md` | `docs/en/troubleshooting.md` |
 
-Tài liệu tối ưu cho LLM:
+## Công nghệ
 
-- Tổng quan: `docs/llm/project-summary.md`
-- Kiến trúc: `docs/llm/architecture.md`
-- HTTP API: `docs/llm/api-reference.md`
-- WebSocket protocol: `docs/llm/websocket-spec.md`
-- Coding standards cho agent: `docs/llm/coding-standards.md`
+Next.js 16 · React 19 · Express 5 · tmux · Tailwind CSS 4 · Zustand · Zod
+
+## Giấy phép
+
+MIT
+
+---
+
+# Codeject
+
+Mobile-first web control surface for local CLI coding assistants.
+
+![Codeject web app screenshot](./docs/assets/images/readme-landing.png)
+
+## Why Codeject?
+
+Long CLI sessions are hard to follow on phones and awkward to manage across multiple assistants. Codeject keeps runtime on your machine but gives you a compact web UI for monitoring, prompting, and approvals. The key difference is chat-first interaction with safe action cards plus a lightweight terminal tab when direct input is unavoidable.
+
+## Features
+
+- **Session control:** Create, restore, and delete multiple CLI sessions.
+- **Chat-first workflow:** Send prompts, handle approvals, and answer input requests inline.
+- **Mobile readability:** Fixed header/composer, transcript-only scroll, adjustable font size.
+- **Remote access:** Quick and named Cloudflare tunnel modes with per-device auth.
+- **Runtime safety:** Shared Zod validation for WebSocket frames at client and server boundaries.
+- **Background awareness:** Optional browser notifications for action-needed, reply-ready, errors, and idle.
+
+## Quick Start
+
+```bash
+git clone <repo-url> && cd codeject
+npm install
+npm run dev
+```
+
+- UI: `http://localhost:4028`
+- API + WebSocket: `http://localhost:3500`
+
+## Documentation
+
+| Topic | Vietnamese | English |
+|-------|------------|---------|
+| Getting Started | `docs/getting-started.md` | `docs/en/getting-started.md` |
+| Usage Guide | `docs/usage-guide.md` | `docs/en/usage-guide.md` |
+| Architecture | `docs/architecture.md` | `docs/en/architecture.md` |
+| Deployment | `docs/deployment.md` | `docs/en/deployment.md` |
+| Configuration | `docs/configuration.md` | `docs/en/configuration.md` |
+| Troubleshooting | `docs/troubleshooting.md` | `docs/en/troubleshooting.md` |
+
+## Tech Stack
+
+Next.js 16 · React 19 · Express 5 · tmux · Tailwind CSS 4 · Zustand · Zod
+
+## License
+
+MIT

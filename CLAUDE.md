@@ -113,12 +113,14 @@ Server only:
 
 Use `docs/` as the repository documentation source of truth for humans.
 
-- Human-facing docs (Vietnamese) live in `docs/*.md` (for example: `docs/getting-started.md`, `docs/system-architecture.md`, `docs/project-roadmap.md`).
+- Human-facing docs (Vietnamese) live in `docs/*.md` (for example: `docs/getting-started.md`, `docs/usage-guide.md`, `docs/architecture.md`, `docs/deployment.md`, `docs/configuration.md`, `docs/troubleshooting.md`).
+- Human-facing docs (English mirror) live in `docs/en/*.md` with matching filenames.
 - LLM-facing compact docs live in `docs/llm/*.md` (for example: `docs/llm/project-summary.md`, `docs/llm/architecture.md`, `docs/llm/api-reference.md`).
 
-When implementation changes phase status or architecture, update at least:
+When implementation changes architecture or user-facing behavior, update at least:
 
 - `README.md`
-- `docs/project-roadmap.md`
-- `docs/system-architecture.md`
-- any directly affected doc (human and LLM variants)
+- `CHANGELOG.md`
+- affected docs in `docs/*.md`
+- matching mirror docs in `docs/en/*.md` when content is user-facing
+- any directly affected LLM docs in `docs/llm/*.md`
