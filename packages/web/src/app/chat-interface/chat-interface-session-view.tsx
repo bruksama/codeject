@@ -17,9 +17,6 @@ import { useHybridSession } from '@/hooks/use-hybrid-session';
 import { useSessionApi } from '@/hooks/use-session-api';
 import type { Session } from '@/types';
 
-const CHAT_TRANSCRIPT_BOTTOM_GAP = '16px';
-const CHAT_COMPOSER_MENU_CLEARANCE = 'var(--chat-command-menu-clearance, 320px)';
-
 interface ChatInterfaceSessionViewProps {
   onBackToSessions: () => void;
   session: Session;
@@ -32,7 +29,6 @@ export function ChatInterfaceSessionView({
   const sessionApi = useSessionApi();
   const [activeTab, setActiveTab] = useState<SessionTab>('chat');
   const [chatDraft, setChatDraft] = useState('');
-  const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const { handleMessage: handleNotificationMessage } = useChatNotifications(session.id);
   const hybrid = useHybridSession(session.id, { onMessage: handleNotificationMessage });
   const reconnectToastCycleRef = useRef<string | null>(null);
@@ -117,15 +113,24 @@ export function ChatInterfaceSessionView({
     <div className="flex h-dvh flex-col overflow-hidden bg-[#08080f]">
       <MobileScreenHeader
         bottomContent={
-          <div className="flex w-full flex-col gap-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <ConnectionBadge showLabel size="sm" status={hybrid.status} />
-              <div className="min-w-0 max-w-full flex-1 truncate rounded-full border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.7rem] text-white/48">
+          <div className="flex w-full min-w-0 items-center gap-1.5">
+            <ConnectionBadge
+              className="shrink-0 gap-1.5 px-2.5 py-1.5 text-[0.68rem] leading-none"
+              showLabel
+              size="sm"
+              status={hybrid.status}
+            />
+            <div
+              className="inline-flex h-8 min-w-0 flex-1 items-center rounded-full border border-white/8 bg-white/[0.03] px-3 text-[0.7rem] leading-none text-white/48"
+              title={session.terminal?.sessionName ?? 'tmux starting'}
+            >
+              <span className="truncate">
                 {session.terminal?.sessionName ? session.terminal.sessionName : 'tmux starting'}
-              </div>
+              </span>
             </div>
             <SessionTabSwitcher
               activeTab={activeTab}
+              compact
               onTabChange={handleTabChange}
               terminalBadge={showTerminalBadge}
             />
@@ -134,13 +139,16 @@ export function ChatInterfaceSessionView({
         onBack={onBackToSessions}
         rightActions={
           <MobileActionButton
-            className="max-w-[6.5rem]"
+            className="w-10 gap-0 rounded-full px-0 shadow-none"
             label="Reconnect session"
             onClick={handleReconnectSession}
             size="sm"
+            title="Reconnect session"
           >
-            <RefreshCcw className="shrink-0" size={16} />
-            <span className="text-xs font-semibold">Reconnect</span>
+            <RefreshCcw
+              className={hybrid.status === 'connecting' ? 'animate-spin shrink-0' : 'shrink-0'}
+              size={16}
+            />
           </MobileActionButton>
         }
         subtitle={`${session.cliProgram.name} · ${session.workspacePath}`}
@@ -182,9 +190,6 @@ export function ChatInterfaceSessionView({
             <ChatSessionPane
               chatState={hybrid.chatState}
               cliProgramId={session.cliProgram.id}
-              composerClearance={
-                isCommandMenuOpen ? CHAT_COMPOSER_MENU_CLEARANCE : CHAT_TRANSCRIPT_BOTTOM_GAP
-              }
               disabled={hybrid.status === 'error'}
               errorMessage={showRecoveryBanner ? hybrid.lastError : null}
               isBusy={isHandlingPrompt}
@@ -200,7 +205,6 @@ export function ChatInterfaceSessionView({
                 }
                 setChatDraft('');
               }}
-              onSuggestionMenuVisibilityChange={setIsCommandMenuOpen}
               onValueChange={setChatDraft}
               programIcon={session.cliProgram.icon}
               programName={session.cliProgram.name}

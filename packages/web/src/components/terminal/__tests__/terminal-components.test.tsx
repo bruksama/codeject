@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TerminalInputBar } from '@/components/terminal/terminal-input-bar';
 import { TerminalSnapshotViewer } from '@/components/terminal/terminal-snapshot-viewer';
+import { SessionTabSwitcher } from '@/components/terminal/session-tab-switcher';
 import { TerminalVirtualKeyboard } from '@/components/terminal/terminal-virtual-keyboard';
 
 describe('terminal components', () => {
@@ -76,5 +77,23 @@ describe('terminal components', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tab' }));
 
     expect(onKey).toHaveBeenCalledWith('Tab');
+  });
+
+  it('renders the compact session tab switcher as an icon-only segmented control', () => {
+    render(<SessionTabSwitcher activeTab="chat" compact onTabChange={vi.fn()} terminalBadge />);
+
+    const chatTab = screen.getByRole('button', { name: 'Chat' });
+    const terminalTab = screen.getByRole('button', { name: 'Terminal' });
+
+    expect(chatTab.parentElement).toHaveClass('inline-flex');
+    expect(chatTab).toHaveClass('rounded-full');
+    expect(chatTab).toHaveAttribute('aria-pressed', 'true');
+    expect(terminalTab).toHaveClass('rounded-full');
+    expect(terminalTab).toHaveAttribute('aria-pressed', 'false');
+    expect(chatTab).not.toHaveTextContent('Chat');
+    expect(terminalTab).not.toHaveTextContent('Terminal');
+    expect(chatTab.querySelector('svg')).toBeInTheDocument();
+    expect(terminalTab.querySelector('svg')).toBeInTheDocument();
+    expect(terminalTab.querySelector('[data-terminal-badge="true"]')).toBeInTheDocument();
   });
 });

@@ -1,13 +1,16 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatTranscript } from '@/components/chat/chat-transcript';
 import type { ChatState, Message } from '@/types';
 
+const DEFAULT_COMPOSER_CLEARANCE = '140px';
+const FLOATING_COMPOSER_GAP_PX = 20;
+
 interface ChatSessionPaneProps {
   chatState?: ChatState;
   cliProgramId: string;
-  composerClearance: string;
   disabled?: boolean;
   errorMessage?: string | null;
   isBusy?: boolean;
@@ -17,7 +20,6 @@ interface ChatSessionPaneProps {
   onInterrupt: () => void;
   onSubmitAction: (submit: string) => boolean | Promise<boolean>;
   onSubmitPrompt: () => void;
-  onSuggestionMenuVisibilityChange: (isOpen: boolean) => void;
   onValueChange: (value: string) => void;
   programIcon: string;
   programName: string;
@@ -28,7 +30,6 @@ interface ChatSessionPaneProps {
 export function ChatSessionPane({
   chatState,
   cliProgramId,
-  composerClearance,
   disabled = false,
   errorMessage = null,
   isBusy = false,
@@ -38,15 +39,38 @@ export function ChatSessionPane({
   onInterrupt,
   onSubmitAction,
   onSubmitPrompt,
-  onSuggestionMenuVisibilityChange,
   onValueChange,
   programIcon,
   programName,
   sessionId,
   value,
 }: ChatSessionPaneProps) {
+  const composerOverlayRef = useRef<HTMLDivElement | null>(null);
+  const [composerClearance, setComposerClearance] = useState(DEFAULT_COMPOSER_CLEARANCE);
+
+  useEffect(() => {
+    const element = composerOverlayRef.current;
+    if (!element || !isVisible) {
+      return;
+    }
+
+    const syncComposerClearance = () => {
+      setComposerClearance(`${element.offsetHeight + FLOATING_COMPOSER_GAP_PX}px`);
+    };
+
+    syncComposerClearance();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => syncComposerClearance());
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 px-3 pt-3">
         <ChatTranscript
           chatState={chatState}
@@ -60,22 +84,24 @@ export function ChatSessionPane({
         />
       </div>
       <div
-        className="shrink-0 border-t border-white/6 px-3 pt-2"
+        ref={composerOverlayRef}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3"
         style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}
       >
-        <ChatComposer
-          cliProgramId={cliProgramId}
-          className="z-20"
-          disabled={disabled}
-          errorMessage={errorMessage}
-          isVisible={isVisible}
-          isBusy={isBusy}
-          onSuggestionMenuVisibilityChange={onSuggestionMenuVisibilityChange}
-          onInterrupt={onInterrupt}
-          onSubmit={onSubmitPrompt}
-          onValueChange={onValueChange}
-          value={value}
-        />
+        <div className="pointer-events-auto">
+          <ChatComposer
+            cliProgramId={cliProgramId}
+            className="z-20"
+            disabled={disabled}
+            errorMessage={errorMessage}
+            isVisible={isVisible}
+            isBusy={isBusy}
+            onInterrupt={onInterrupt}
+            onSubmit={onSubmitPrompt}
+            onValueChange={onValueChange}
+            value={value}
+          />
+        </div>
       </div>
     </div>
   );

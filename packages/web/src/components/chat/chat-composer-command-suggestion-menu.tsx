@@ -22,7 +22,7 @@ export function ChatComposerCommandSuggestionMenu({
 
   return (
     <div
-      className="slide-up mb-2 overflow-hidden rounded-[22px] border border-white/12 bg-[rgba(12,12,20,0.9)] shadow-[0_18px_36px_rgba(0,0,0,0.34)]"
+      className="slide-up relative z-10 mb-2 overflow-hidden rounded-[22px] border border-white/12 bg-[rgba(12,12,20,0.9)] shadow-[0_18px_36px_rgba(0,0,0,0.34)]"
       style={{
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
