@@ -144,7 +144,8 @@ export default function ChatMessage({ message, programIcon = '🤖' }: ChatMessa
 
   return (
     <div
-      className={`content-auto-message mb-5 flex gap-3 fade-in ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+      // Avoid content-visibility here; Chromium can paint stale transcript rows during rapid chat updates.
+      className={`mb-5 flex gap-3 fade-in ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
       onContextMenu={(e) => {
         e.preventDefault();
         setShowTimestamp(!showTimestamp);

@@ -111,11 +111,6 @@ summary:focus-visible,
   contain-intrinsic-size: 0 152px;
 }
 
-.content-auto-message {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 140px;
-}
-
 .field-support-text {
   min-height: 1.25rem;
 }
@@ -267,6 +262,11 @@ summary:focus-visible,
   min-height: 40px;
   max-height: 144px;
   line-height: 1.5;
+}
+
+.chat-composer-textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 /* Settings list */
