@@ -11,7 +11,8 @@
   - Browser notification support is opt-in per browser via `AppSettings.notifications`.
   - Permission state is synced against the real browser permission when the app regains focus/visibility.
   - Viewport-locked page shells keep headers fixed on mobile; chat keeps the header and composer dock static while only the transcript scrolls.
-  - Session view now exposes `Chat` and `Terminal` tabs; the terminal tab is a lightweight tmux snapshot viewer with an input bar and virtual special-key keyboard, not a full emulator.
+  - Session view keeps persistent runtime controls inside a two-row header: top row for back/title/icon-only reconnect, bottom row for connection status, a truncated tmux badge, and compact icon-only `Chat` / `Terminal` switching.
+  - The terminal tab is a lightweight tmux snapshot viewer with an input bar and virtual special-key keyboard, not a full emulator.
   - Font-size scaling also updates shell clearances for bottom navigation and the chat command-menu dock so large mobile text does not break header/action alignment.
 - Talks to server via:
   - HTTP REST API under `/api/*`.

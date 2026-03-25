@@ -34,8 +34,9 @@ Frontend được build thành static export và được backend phục vụ tr
 - chat screen có connection banner theo cycle reconnect/disconnect, auto-hide khi recover, va toast retry khi reconnect fail nhiều lần
 - action card inline cho confirm, select, va free-input
 - chat composer có first-token command suggestion theo provider: Claude dùng `/`, Codex dùng `$`
-- session view có hai tab `Chat` va `Terminal`; terminal tab render tmux snapshot read-only, input bar, va virtual keyboard cho các key đặc biệt
-- nếu server báo `terminal-required` mà không có action card an toàn, chat header sẽ hiện badge trên tab `Terminal` để user chuyển sang direct interaction
+- session view giữ runtime controls trong header 2 hàng: hàng trên có back, title/subtitle, va reconnect icon-only; hàng dưới có status badge, chip `tmux` truncate, va switcher `Chat`/`Terminal` icon-only
+- terminal tab render tmux snapshot read-only, input bar, va virtual keyboard cho các key đặc biệt
+- nếu server báo `terminal-required` mà không có action card an toàn, chat header sẽ hiện badge nhỏ trên icon `Terminal` để user chuyển sang direct interaction; banner warning vẫn nằm dưới header
 - session list, new session, va CLI program editor đã tách render tree lớn thành local components để page-level state rõ hơn va file nhỏ hơn
 - `AppSettings.fontSize` là UI preference phía frontend, đổi từ `Settings > Appearance`, persist trong browser-local Zustand/localStorage thay vì lưu xuống backend store
 - `AppSettings.notifications` là UI preference opt-in phía frontend; browser permission được sync lại khi app focus/visible để xóa stale toggle nếu user revoke quyền ngoài app

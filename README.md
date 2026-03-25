@@ -19,6 +19,7 @@ Codeject đặt một lớp giao diện web gọn nhẹ lên trên backend local
 - Chọn chương trình CLI như Claude Code, Codex hoặc generic shell cho từng session.
 - Chat-first surface để đọc transcript dễ dàng trên màn hình nhỏ.
 - Chat screen giờ giữ header và composer cố định; chỉ transcript cuộn như app chat thông thường để theo dõi session dài trên điện thoại dễ hơn.
+- Session header giờ gom runtime controls gọn hơn: reconnect icon-only ở hàng trên, còn hàng dưới giữ status badge, chip `tmux` truncate, và Chat/Terminal switcher icon-only để transcript có thêm vertical space.
 - Session view có thêm tab `Terminal` với snapshot terminal read-only, input bar, và virtual keyboard cho Tab/Esc/arrows/Ctrl combos khi action card không đủ.
 - `Settings > Appearance > Font Size` đổi cỡ chữ toàn app ngay lập tức, lưu theo từng trình duyệt, và scale shared shell spacing đủ an toàn để header/action/composer không lệch trên mobile.
 - `Settings > Appearance > Accent Color` đổi màu nhấn toàn app, cũng lưu theo từng trình duyệt.
