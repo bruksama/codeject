@@ -58,8 +58,8 @@
 
 ## Source-of-truth docs
 
-- Human docs (Vietnamese): `docs/*.md`
-- LLM docs (English, compact): `docs/llm/*.md`
+- Human docs (Vietnamese): [`docs/*.md`](../architecture.md)
+- LLM docs (English, compact): [`docs/llm/*.md`](./project-summary.md)
 
 ## Recent cleanup/stabilization notes
 

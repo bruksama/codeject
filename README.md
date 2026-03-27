@@ -25,6 +25,12 @@ npm install
 npm run dev
 ```
 
+Dừng runtime an toàn:
+
+```bash
+npm run safe-stop
+```
+
 - UI: `http://localhost:4028`
 - API + WebSocket: `http://localhost:3500`
 
@@ -32,12 +38,12 @@ npm run dev
 
 | Chủ đề | Tiếng Việt | English |
 |-------|------------|---------|
-| Bắt đầu nhanh | `docs/getting-started.md` | `docs/en/getting-started.md` |
-| Hướng dẫn sử dụng | `docs/usage-guide.md` | `docs/en/usage-guide.md` |
-| Kiến trúc | `docs/architecture.md` | `docs/en/architecture.md` |
-| Triển khai | `docs/deployment.md` | `docs/en/deployment.md` |
-| Cấu hình | `docs/configuration.md` | `docs/en/configuration.md` |
-| Xử lý sự cố | `docs/troubleshooting.md` | `docs/en/troubleshooting.md` |
+| Bắt đầu nhanh | [`docs/getting-started.md`](./docs/getting-started.md) | [`docs/en/getting-started.md`](./docs/en/getting-started.md) |
+| Hướng dẫn sử dụng | [`docs/usage-guide.md`](./docs/usage-guide.md) | [`docs/en/usage-guide.md`](./docs/en/usage-guide.md) |
+| Kiến trúc | [`docs/architecture.md`](./docs/architecture.md) | [`docs/en/architecture.md`](./docs/en/architecture.md) |
+| Triển khai | [`docs/deployment.md`](./docs/deployment.md) | [`docs/en/deployment.md`](./docs/en/deployment.md) |
+| Cấu hình | [`docs/configuration.md`](./docs/configuration.md) | [`docs/en/configuration.md`](./docs/en/configuration.md) |
+| Xử lý sự cố | [`docs/troubleshooting.md`](./docs/troubleshooting.md) | [`docs/en/troubleshooting.md`](./docs/en/troubleshooting.md) |
 
 ## Công nghệ
 
@@ -76,6 +82,12 @@ npm install
 npm run dev
 ```
 
+Stop runtime safely:
+
+```bash
+npm run safe-stop
+```
+
 - UI: `http://localhost:4028`
 - API + WebSocket: `http://localhost:3500`
 
@@ -83,12 +95,12 @@ npm run dev
 
 | Topic | Vietnamese | English |
 |-------|------------|---------|
-| Getting Started | `docs/getting-started.md` | `docs/en/getting-started.md` |
-| Usage Guide | `docs/usage-guide.md` | `docs/en/usage-guide.md` |
-| Architecture | `docs/architecture.md` | `docs/en/architecture.md` |
-| Deployment | `docs/deployment.md` | `docs/en/deployment.md` |
-| Configuration | `docs/configuration.md` | `docs/en/configuration.md` |
-| Troubleshooting | `docs/troubleshooting.md` | `docs/en/troubleshooting.md` |
+| Getting Started | [`docs/getting-started.md`](./docs/getting-started.md) | [`docs/en/getting-started.md`](./docs/en/getting-started.md) |
+| Usage Guide | [`docs/usage-guide.md`](./docs/usage-guide.md) | [`docs/en/usage-guide.md`](./docs/en/usage-guide.md) |
+| Architecture | [`docs/architecture.md`](./docs/architecture.md) | [`docs/en/architecture.md`](./docs/en/architecture.md) |
+| Deployment | [`docs/deployment.md`](./docs/deployment.md) | [`docs/en/deployment.md`](./docs/en/deployment.md) |
+| Configuration | [`docs/configuration.md`](./docs/configuration.md) | [`docs/en/configuration.md`](./docs/en/configuration.md) |
+| Troubleshooting | [`docs/troubleshooting.md`](./docs/troubleshooting.md) | [`docs/en/troubleshooting.md`](./docs/en/troubleshooting.md) |
 
 ## Tech Stack
 

@@ -15,8 +15,8 @@ This document summarizes the most important rules for AI coding agents working i
 - `packages/web/src`: frontend (Next.js App Router, React 19, Tailwind 4, Zustand).
 - `packages/server/src`: backend (Express 5, REST, WebSocket, tmux, tunnel).
 - `packages/shared/src`: shared TypeScript types.
-- `docs/`: human-facing documentation.
-- `docs/llm/`: LLM-facing compact documentation.
+- [`docs/`](../project-summary.md): human-facing documentation.
+- [`docs/llm/`](./project-summary.md): LLM-facing compact documentation.
 
 ## Frontend rules
 
@@ -40,12 +40,12 @@ This document summarizes the most important rules for AI coding agents working i
 
 - `docs/` is the source of truth for documentation.
 - When architecture or phase status changes, update:
-  - `README.md`
-  - `CHANGELOG.md`
-  - `docs/architecture.md`
-  - `docs/deployment.md`
-  - `docs/configuration.md`
-  - `docs/troubleshooting.md`
+  - [`README.md`](../../README.md)
+  - [`CHANGELOG.md`](../../CHANGELOG.md)
+  - [`docs/architecture.md`](../architecture.md)
+  - [`docs/deployment.md`](../deployment.md)
+  - [`docs/configuration.md`](../configuration.md)
+  - [`docs/troubleshooting.md`](../troubleshooting.md)
   - any directly affected docs
 - Human docs (VN) should be concise and readable.
 - LLM docs (EN) should be compact, structured, and token-efficient.

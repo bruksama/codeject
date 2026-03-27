@@ -25,6 +25,12 @@ npm install
 npm run dev
 ```
 
+Dừng runtime an toàn:
+
+```bash
+npm run safe-stop
+```
+
 Mở UI tại `http://localhost:4028`.
 
 ### Production local
@@ -38,6 +44,6 @@ Mở ứng dụng tại `http://localhost:3500`.
 
 ## Bước tiếp
 
-- Luồng thao tác hằng ngày: `docs/usage-guide.md`
-- Tùy chỉnh behavior/UI: `docs/configuration.md`
-- Deploy và remote access: `docs/deployment.md`
+- Luồng thao tác hằng ngày: [`docs/usage-guide.md`](./usage-guide.md)
+- Tùy chỉnh behavior/UI: [`docs/configuration.md`](./configuration.md)
+- Deploy và remote access: [`docs/deployment.md`](./deployment.md)

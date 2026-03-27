@@ -25,6 +25,12 @@ npm install
 npm run dev
 ```
 
+Stop runtime safely:
+
+```bash
+npm run safe-stop
+```
+
 Open `http://localhost:4028` for the web UI. API and WebSocket run at `http://localhost:3500`.
 
 ### Local Production
@@ -38,6 +44,6 @@ Open `http://localhost:3500`.
 
 ## Next Steps
 
-- Usage recipes: `docs/en/usage-guide.md`
-- Configuration knobs: `docs/en/configuration.md`
-- Deployment and remote access: `docs/en/deployment.md`
+- Usage recipes: [`docs/en/usage-guide.md`](./usage-guide.md)
+- Configuration knobs: [`docs/en/configuration.md`](./configuration.md)
+- Deployment and remote access: [`docs/en/deployment.md`](./deployment.md)

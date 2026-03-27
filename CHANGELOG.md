@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-03-28 — Safe Stop Runtime
+
+### Added
+- Added root command `npm run safe-stop` to stop repository npm runtimes with signal escalation (`SIGINT` → `SIGTERM` → `SIGKILL`) and release checks for `3500`/`4028`.
+- Added tmux cleanup in safe-stop for `codeject-*` sessions to avoid stale terminal runtime state.
+
+### Changed
+- Updated quick-start and usage docs (VN/EN) with explicit safe-stop guidance for terminal runtime shutdown.
+
 ## 2026-03-24 — Terminal Tab
 
 ### Added

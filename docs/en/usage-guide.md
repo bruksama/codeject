@@ -36,7 +36,7 @@ Codeject is optimized for fast mobile control: read transcript, answer action ca
 3. Leave the tab; Codeject can notify on approval-needed, reply-ready, runtime error, or idle.
 4. Tap a notification to jump back to the related session.
 
-Full notification setup is in `docs/en/configuration.md`.
+Full notification setup is in [`docs/en/configuration.md`](./configuration.md).
 
 ## Remote access from phone
 
@@ -45,7 +45,21 @@ Full notification setup is in `docs/en/configuration.md`.
 3. Save bearer key in `Device Auth` on that device.
 4. Use the same interface as local: session list, chat, and action cards.
 
-Full setup is in `docs/en/deployment.md`.
+Full setup is in [`docs/en/deployment.md`](./deployment.md).
+
+## Stop runtime safely from terminal
+
+When runtime scripts do not stop cleanly with Ctrl+C, run:
+
+```bash
+npm run safe-stop
+```
+
+`safe-stop` will:
+- target npm runtime process groups scoped to this repository,
+- use graceful escalation (`SIGINT` → `SIGTERM` → `SIGKILL`),
+- kill `codeject-*` tmux sessions,
+- verify ports `3500` and `4028` are released for this repo.
 
 ## Use the Terminal tab
 
