@@ -25,7 +25,9 @@ npm install
 npm run dev
 ```
 
-Dừng runtime an toàn:
+Dừng dev runtime bằng `Ctrl+C`.
+
+Nếu terminal bị kẹt hoặc cần cleanup từ shell khác:
 
 ```bash
 npm run safe-stop
@@ -82,7 +84,9 @@ npm install
 npm run dev
 ```
 
-Stop runtime safely:
+Stop the dev runtime with `Ctrl+C`.
+
+If the runtime is stuck or you need cleanup from another shell:
 
 ```bash
 npm run safe-stop

@@ -5,12 +5,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 SELF_PID="$$"
 SELF_PGID="$(ps -o pgid= -p "$SELF_PID" 2>/dev/null | tr -d ' ')"
+EXCLUDED_PGIDS_RAW="${SAFE_STOP_EXCLUDE_PGIDS:-}"
 PORTS=(3500 4028)
 WAIT_SECONDS=6
 POLL_INTERVAL_SECONDS="0.2"
 
 # Process-group targets discovered from repo npm runtimes and repo listeners.
 declare -A TARGET_PGIDS=()
+declare -A EXCLUDED_PGIDS=()
 
 log() {
   printf '[safe-stop] %s\n' "$*"
@@ -73,7 +75,16 @@ add_target_pgid() {
   local pgid="$1"
   [[ "$pgid" =~ ^[0-9]+$ ]] || return
   [[ "$pgid" == "$SELF_PGID" ]] && return
+  [[ -n "${EXCLUDED_PGIDS[$pgid]:-}" ]] && return
   TARGET_PGIDS["$pgid"]=1
+}
+
+load_excluded_pgids() {
+  local pgid
+  for pgid in $EXCLUDED_PGIDS_RAW; do
+    [[ "$pgid" =~ ^[0-9]+$ ]] || continue
+    EXCLUDED_PGIDS["$pgid"]=1
+  done
 }
 
 collect_repo_npm_pgids() {
@@ -231,6 +242,8 @@ verify_repo_listeners_cleared() {
 
 main() {
   local failed=0
+
+  load_excluded_pgids
 
   collect_target_pgids
   prune_dead_target_pgids

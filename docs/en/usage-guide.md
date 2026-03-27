@@ -49,7 +49,9 @@ Full setup is in [`docs/en/deployment.md`](./deployment.md).
 
 ## Stop runtime safely from terminal
 
-When runtime scripts do not stop cleanly with Ctrl+C, run:
+When running root `npm run dev`, `Ctrl+C` is the primary stop flow and triggers cleanup for web + server.
+
+If runtime scripts do not stop cleanly, or you need cleanup from another shell, run:
 
 ```bash
 npm run safe-stop

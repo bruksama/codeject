@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-03-28 — Dev Runtime Supervisor
+
+### Added
+- Added a root dev supervisor that starts the web and server workspaces without Turbo for local development shutdown control.
+
+### Changed
+- Changed root `npm run dev` to use the supervisor so `Ctrl+C` triggers `safe-stop` cleanup and exits cleanly.
+- Tightened `safe-stop` targeting with optional excluded process groups so supervisor-driven shutdown does not self-interrupt the launcher.
+- Updated README and run/usage docs (VN/EN) to document `Ctrl+C` as the primary dev stop flow and `npm run safe-stop` as fallback cleanup.
+
 ## 2026-03-28 — Safe Stop Runtime
 
 ### Added

@@ -49,7 +49,9 @@ Chi tiết setup xem [`docs/deployment.md`](./deployment.md).
 
 ## Dừng runtime an toàn từ terminal
 
-Khi runtime script không dừng sạch bằng Ctrl+C, chạy:
+Khi chạy root `npm run dev`, `Ctrl+C` là luồng dừng chính thức và sẽ trigger cleanup cho web + server.
+
+Nếu runtime script không dừng sạch, hoặc cần cleanup từ terminal khác, chạy:
 
 ```bash
 npm run safe-stop

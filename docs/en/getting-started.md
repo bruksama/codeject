@@ -25,7 +25,9 @@ npm install
 npm run dev
 ```
 
-Stop runtime safely:
+Stop the dev runtime with `Ctrl+C`.
+
+If the runtime gets stuck or you need cleanup from another shell:
 
 ```bash
 npm run safe-stop
