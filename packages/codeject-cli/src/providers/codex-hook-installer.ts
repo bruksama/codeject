@@ -21,6 +21,7 @@ const WRAPPER_FILE_NAME = 'codeject-codex-stop-hook';
 const TEMPLATE_PATH = path.resolve(import.meta.dirname, '../templates/codeject-codex-stop-hook');
 
 type CodexHooksConfig = Record<string, unknown> & {
+  hooks?: Record<string, unknown>;
   Stop?: unknown[];
 };
 
@@ -33,7 +34,8 @@ export async function installCodexHook(
   const hookCommand = shellQuote(wrapperPath);
   const hooksFileExisted = await fileExists(paths.codexHooksFile);
   const hooksConfig = await readJsonFile<CodexHooksConfig>(paths.codexHooksFile, {});
-  const stopEntries = Array.isArray(hooksConfig.Stop) ? hooksConfig.Stop : [];
+  const hookMap = ensureHookMap(hooksConfig);
+  const stopEntries = Array.isArray(hookMap.Stop) ? hookMap.Stop : [];
 
   if (!hasHookCommand(stopEntries, hookCommand)) {
     stopEntries.push({
@@ -46,7 +48,8 @@ export async function installCodexHook(
     });
   }
 
-  hooksConfig.Stop = stopEntries;
+  hookMap.Stop = stopEntries;
+  removeLegacyTopLevelStopHook(hooksConfig, hookCommand);
   await writeJsonFile(paths.codexHooksFile, hooksConfig);
 
   const existingConfig = await readTextFile(paths.codexConfigFile);
@@ -72,17 +75,32 @@ export async function uninstallCodexHook(
 ) {
   const hooksConfig = await readJsonFile<CodexHooksConfig | null>(record.hooksFilePath, null);
   if (hooksConfig) {
-    const nextStopEntries = removeHookCommand(Array.isArray(hooksConfig.Stop) ? hooksConfig.Stop : [], record.hookCommand);
+    const hookMap = ensureHookMap(hooksConfig);
+    const nextStopEntries = removeHookCommand(
+      Array.isArray(hookMap.Stop) ? hookMap.Stop : [],
+      record.hookCommand
+    );
     if (nextStopEntries.length > 0) {
-      hooksConfig.Stop = nextStopEntries;
-      await writeJsonFile(record.hooksFilePath, hooksConfig);
+      hookMap.Stop = nextStopEntries;
+    } else {
+      delete hookMap.Stop;
+      collapseEmptyHookMap(hooksConfig);
+    }
+
+    const nextLegacyEntries = removeHookCommand(
+      Array.isArray(hooksConfig.Stop) ? hooksConfig.Stop : [],
+      record.hookCommand
+    );
+    if (nextLegacyEntries.length > 0) {
+      hooksConfig.Stop = nextLegacyEntries;
     } else {
       delete hooksConfig.Stop;
-      if (record.createdHooksFile && Object.keys(hooksConfig).length === 0) {
-        await deleteFileIfExists(record.hooksFilePath);
-      } else {
-        await writeJsonFile(record.hooksFilePath, hooksConfig);
-      }
+    }
+
+    if (record.createdHooksFile && Object.keys(hooksConfig).length === 0) {
+      await deleteFileIfExists(record.hooksFilePath);
+    } else {
+      await writeJsonFile(record.hooksFilePath, hooksConfig);
     }
   }
 
@@ -107,7 +125,12 @@ export async function getCodexHookStatus(
 ): Promise<ProviderStatus> {
   const expectedCommand = record?.hookCommand ?? shellQuote(path.join(paths.binDir, WRAPPER_FILE_NAME));
   const hooksConfig = await readJsonFile<CodexHooksConfig | null>(paths.codexHooksFile, null);
-  const hookInstalled = hasHookCommand(Array.isArray(hooksConfig?.Stop) ? hooksConfig.Stop : [], expectedCommand);
+  const hookMap = isObject(hooksConfig?.hooks) ? hooksConfig.hooks : {};
+  const hookInstalled = hasHookCommand(
+    Array.isArray(hookMap.Stop) ? hookMap.Stop : [],
+    expectedCommand
+  );
+  const legacyTopLevelInstalled = hasHookCommand(Array.isArray(hooksConfig?.Stop) ? hooksConfig.Stop : [], expectedCommand);
   const configText = await readTextFile(paths.codexConfigFile);
   const featureEnabled = configText ? isCodexHooksFeatureEnabled(configText) : false;
   const wrapperExists = await fileExists(record?.wrapperPath ?? path.join(paths.binDir, WRAPPER_FILE_NAME));
@@ -118,6 +141,9 @@ export async function getCodexHookStatus(
   }
   if (wrapperExists && !hookInstalled) {
     issues.push('Codex hooks.json entry is missing');
+  }
+  if (legacyTopLevelInstalled) {
+    issues.push('Codex hook is installed in legacy top-level Stop format');
   }
   if ((hookInstalled || wrapperExists) && !featureEnabled) {
     issues.push('Codex hooks feature flag is disabled');
@@ -154,6 +180,27 @@ function hasHookCommand(entries: unknown[], hookCommand: string) {
       (hook) => isObject(hook) && hook.type === 'command' && hook.command === hookCommand
     )
   );
+}
+
+function ensureHookMap(config: CodexHooksConfig) {
+  const hooks = isObject(config.hooks) ? config.hooks : {};
+  config.hooks = hooks;
+  return hooks as Record<string, unknown> & { Stop?: unknown[] };
+}
+
+function removeLegacyTopLevelStopHook(config: CodexHooksConfig, hookCommand: string) {
+  const nextStopEntries = removeHookCommand(Array.isArray(config.Stop) ? config.Stop : [], hookCommand);
+  if (nextStopEntries.length > 0) {
+    config.Stop = nextStopEntries;
+  } else {
+    delete config.Stop;
+  }
+}
+
+function collapseEmptyHookMap(config: CodexHooksConfig) {
+  if (isObject(config.hooks) && Object.keys(config.hooks).length === 0) {
+    delete config.hooks;
+  }
 }
 
 function removeHookCommand(entries: unknown[], hookCommand: string) {

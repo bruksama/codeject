@@ -57,7 +57,7 @@ test('Claude installer merges and removes only Codeject-managed Stop hooks', asy
   assert.ok(!removedEntries.some((hook) => hook.command === record.hookCommand));
 });
 
-test('Codex installer enables hooks feature, merges hooks.json, and restores config on uninstall', async () => {
+test('Codex installer enables hooks feature, installs nested Stop hooks, and restores config on uninstall', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'codeject-codex-hooks-'));
   const paths = resolveInstallPaths({
     codejectHome: path.join(root, '.codeject'),
@@ -70,17 +70,19 @@ test('Codex installer enables hooks feature, merges hooks.json, and restores con
   await fs.writeFile(
     paths.codexHooksFile,
     JSON.stringify({
-      Stop: [
-        {
-          hooks: [{ command: 'echo existing', type: 'command' }],
-        },
-      ],
+      hooks: {
+        Stop: [
+          {
+            hooks: [{ command: 'echo existing', type: 'command' }],
+          },
+        ],
+      },
     })
   );
 
   const record = await installCodexHook(paths);
   const installedHooks = await readJsonFile<Record<string, unknown>>(paths.codexHooksFile, {});
-  const installedEntries = (installedHooks.Stop as unknown[]).flatMap(
+  const installedEntries = ((installedHooks.hooks as Record<string, unknown>).Stop as unknown[]).flatMap(
     (entry) => ((entry as { hooks?: unknown[] }).hooks ?? []) as Array<Record<string, unknown>>
   );
 
@@ -91,13 +93,53 @@ test('Codex installer enables hooks feature, merges hooks.json, and restores con
 
   await uninstallCodexHook(record, paths);
   const removedHooks = await readJsonFile<Record<string, unknown>>(paths.codexHooksFile, {});
-  const removedEntries = (removedHooks.Stop as unknown[]).flatMap(
+  const removedEntries = ((removedHooks.hooks as Record<string, unknown>).Stop as unknown[]).flatMap(
     (entry) => ((entry as { hooks?: unknown[] }).hooks ?? []) as Array<Record<string, unknown>>
   );
 
   assert.ok(removedEntries.some((hook) => hook.command === 'echo existing'));
   assert.ok(!removedEntries.some((hook) => hook.command === record.hookCommand));
   assert.match((await readTextFile(paths.codexConfigFile)) ?? '', /codex_hooks = false/);
+});
+
+test('Codex installer migrates only Codeject legacy top-level Stop hooks into nested hooks.Stop', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'codeject-codex-legacy-hooks-'));
+  const paths = resolveInstallPaths({
+    codejectHome: path.join(root, '.codeject'),
+    codexConfigFile: path.join(root, '.codex', 'config.toml'),
+    codexHooksFile: path.join(root, '.codex', 'hooks.json'),
+  });
+
+  const expectedCommand = `'${path.join(paths.binDir, 'codeject-codex-stop-hook')}'`;
+  await fs.mkdir(path.dirname(paths.codexConfigFile), { recursive: true });
+  await fs.writeFile(paths.codexConfigFile, '[features]\ncodex_hooks = true\n');
+  await fs.writeFile(
+    paths.codexHooksFile,
+    JSON.stringify({
+      Stop: [
+        {
+          hooks: [
+            { command: expectedCommand, type: 'command' },
+            { command: 'echo keep-legacy', type: 'command' },
+          ],
+        },
+      ],
+    })
+  );
+
+  const record = await installCodexHook(paths);
+  const installedHooks = await readJsonFile<Record<string, unknown>>(paths.codexHooksFile, {});
+  const nestedEntries = ((installedHooks.hooks as Record<string, unknown>).Stop as unknown[]).flatMap(
+    (entry) => ((entry as { hooks?: unknown[] }).hooks ?? []) as Array<Record<string, unknown>>
+  );
+  const legacyEntries = (installedHooks.Stop as unknown[]).flatMap(
+    (entry) => ((entry as { hooks?: unknown[] }).hooks ?? []) as Array<Record<string, unknown>>
+  );
+
+  assert.ok(nestedEntries.some((hook) => hook.command === record.hookCommand));
+  assert.ok(!legacyEntries.some((hook) => hook.command === record.hookCommand));
+  assert.ok(legacyEntries.some((hook) => hook.command === 'echo keep-legacy'));
+  assert.equal((await getCodexHookStatus(paths, record)).healthy, true);
 });
 
 test('reinstall preserves uninstall provenance for Claude and Codex', async () => {
