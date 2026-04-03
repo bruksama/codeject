@@ -82,6 +82,14 @@ export const TerminalRuntimeSchema = z.object({
   windowId: z.string().optional(),
 });
 
+export const ProviderStopSignalSchema = z.object({
+  event: z.literal('stop'),
+  provider: z.enum(['claude', 'codex']),
+  providerSessionId: z.string().optional(),
+  providerTurnId: z.string().optional(),
+  sessionId: z.string(),
+});
+
 export const TerminalKeySchema = z.enum([
   'Enter',
   'Escape',

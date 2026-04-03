@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { spawn, type IPty } from 'node-pty';
 import {
@@ -16,6 +17,7 @@ import { ClaudeCodeAdapter } from '../adapters/claude-code-adapter.js';
 import { CodexAdapter } from '../adapters/codex-adapter.js';
 import { GenericCliAdapter } from '../adapters/generic-cli-adapter.js';
 import { logger } from '../utils/logger.js';
+import { getTranscriptProvider } from './provider-transcript-reader.js';
 import { type SessionStore } from './session-store.js';
 import { MissingTmuxError, TmuxBridge, type TmuxSessionTarget } from './tmux-bridge.js';
 
@@ -74,15 +76,20 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
         return persistedTarget;
       }
 
+      const preparedSession = await this.ensureHookRuntimeSession(session);
       const adapter = this.resolveAdapter(session.cliProgram);
-      const spawnConfig = adapter.createSpawnConfig(session.cliProgram, session.sessionOptions);
-      const size = normalizeSize(session.sessionOptions?.terminal);
+      const spawnConfig = adapter.createSpawnConfig(
+        preparedSession.cliProgram,
+        preparedSession.sessionOptions,
+        preparedSession
+      );
+      const size = normalizeSize(preparedSession.sessionOptions?.terminal);
       const target = await this.tmuxBridge.createDetachedSession({
         cols: size.cols,
-        command: buildShellCommand(spawnConfig.command, spawnConfig.args),
+        command: buildShellCommand(spawnConfig.command, spawnConfig.args, spawnConfig.env),
         rows: size.rows,
         sessionName: buildTmuxSessionName(session.id),
-        workspacePath: session.workspacePath,
+        workspacePath: preparedSession.workspacePath,
       });
 
       this.runtimes.set(session.id, {
@@ -364,6 +371,34 @@ export class TerminalSessionManager extends EventEmitter<TerminalSessionManagerE
     return this.adapters.find((adapter) => adapter.canHandle(program)) ?? this.adapters[this.adapters.length - 1]!;
   }
 
+  private async ensureHookRuntimeSession(session: Session) {
+    const provider = getTranscriptProvider(session);
+    if (!provider) {
+      return session;
+    }
+
+    if (
+      session.providerRuntime?.provider === provider &&
+      session.providerRuntime?.hookToken
+    ) {
+      return session;
+    }
+
+    const providerRuntime = {
+      ...session.providerRuntime,
+      hookToken: session.providerRuntime?.hookToken ?? randomUUID(),
+      provider,
+    };
+    return (
+      (await this.sessionStore.updateSession(session.id, {
+        providerRuntime,
+      })) ?? {
+        ...session,
+        providerRuntime,
+      }
+    );
+  }
+
   private async restorePersistedTarget(session: Session) {
     const terminal = session.terminal;
     if (!terminal?.sessionName || !terminal.paneId || !(await this.tmuxBridge.hasSession(terminal.sessionName))) {
@@ -447,8 +482,9 @@ function isMissingTargetError(error: unknown) {
   return error instanceof Error && /can't find session|can't find pane/i.test(error.message);
 }
 
-function buildShellCommand(command: string, args: string[]) {
-  return [command, ...args].map(quoteShellArg).join(' ');
+function buildShellCommand(command: string, args: string[], env?: Record<string, string>) {
+  const assignments = Object.entries(env ?? {}).map(([key, value]) => `${key}=${quoteShellArg(value)}`);
+  return [...assignments, quoteShellArg(command), ...args.map(quoteShellArg)].join(' ');
 }
 
 function quoteShellArg(value: string) {

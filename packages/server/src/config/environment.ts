@@ -19,6 +19,7 @@ export const environment = {
   host: process.env.HOST ?? DEFAULT_HOST,
   isDevelopment: process.env.NODE_ENV !== 'production',
   port,
+  providerHookServerUrl: process.env.CODEJECT_INTERNAL_SERVER_URL ?? `http://127.0.0.1:${port}`,
   sessionsDir,
   staleSessionMs: 24 * 60 * 60 * 1000,
   tunnelAutoStart: process.env.CODEJECT_TUNNEL_AUTOSTART === '1',

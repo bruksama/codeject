@@ -1,7 +1,8 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { IPtyForkOptions } from 'node-pty';
-import { type CliProgram, type CliSessionOptions, type TerminalSize } from '@codeject/shared';
+import { type CliProgram, type CliSessionOptions, type Session, type TerminalSize } from '@codeject/shared';
+import { environment } from '../config/environment.js';
 
 export interface CliSpawnConfig {
   args: string[];
@@ -17,10 +18,11 @@ export abstract class BaseCliAdapter {
     return this.name === program.id || path.basename(program.command.trim().split(/\s+/, 1)[0] ?? '') === this.name;
   }
 
-  createSpawnConfig(program: CliProgram, sessionOptions?: CliSessionOptions): CliSpawnConfig {
+  createSpawnConfig(program: CliProgram, sessionOptions?: CliSessionOptions, session?: Session): CliSpawnConfig {
     return {
       args: this.buildArgs(program, sessionOptions),
       command: this.getCommand(program),
+      env: this.buildEnv(program, sessionOptions, session),
     };
   }
 
@@ -32,12 +34,32 @@ export abstract class BaseCliAdapter {
     return splitCommandLine(program.command)[0] ?? program.command;
   }
 
+  protected buildEnv(
+    _program: CliProgram,
+    _sessionOptions?: CliSessionOptions,
+    _session?: Session
+  ) {
+    return undefined;
+  }
+
   protected withDefaultPtyOptions(size?: Partial<TerminalSize>): Partial<IPtyForkOptions> {
     return {
       cols: size?.cols ?? 120,
       rows: size?.rows ?? 32,
       cwd: os.homedir(),
       name: 'xterm-256color',
+    };
+  }
+
+  protected buildProviderHookEnv(session: Session | undefined, provider: 'claude' | 'codex') {
+    if (!session?.providerRuntime?.hookToken || session.providerRuntime.provider !== provider) {
+      return undefined;
+    }
+
+    return {
+      CODEJECT_HOOK_TOKEN: session.providerRuntime.hookToken,
+      CODEJECT_SERVER_URL: environment.providerHookServerUrl,
+      CODEJECT_SESSION_ID: session.id,
     };
   }
 }

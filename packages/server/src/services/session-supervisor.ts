@@ -4,6 +4,7 @@ import {
   type ChatActionRequest,
   type ChatState,
   type Message,
+  type ProviderStopSignal,
   type Session,
   type SurfaceRequirement,
   type TerminalSnapshot,
@@ -26,9 +27,13 @@ interface SupervisorEvents {
 const ASSISTANT_IDLE_MS = 1200;
 const FINAL_TRANSCRIPT_SETTLE_RETRY_COUNT = 3;
 const FINAL_TRANSCRIPT_SETTLE_RETRY_MS = 120;
+const PROVIDER_STOP_SETTLE_RETRY_COUNT = 6;
+const PROVIDER_STOP_SETTLE_RETRY_MS = 150;
+const PROVIDER_STOP_DEDUPE_TTL_MS = 5_000;
 
 export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
   private readonly assistantTimers = new Map<string, NodeJS.Timeout>();
+  private readonly providerStopSignals = new Map<string, number>();
   private readonly transcriptReader: ProviderTranscriptReader;
 
   constructor(private readonly sessionStore: SessionStore) {
@@ -120,6 +125,50 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
       chatState,
       requirement: 'terminal-available',
     });
+  }
+
+  async handleProviderStopSignal(sessionId: string, signal: ProviderStopSignal) {
+    const session = await this.sessionStore.getSession(sessionId);
+    if (!session || !isFinalOnlyProviderSession(session) || getTranscriptProvider(session) !== signal.provider) {
+      return false;
+    }
+
+    if (this.isDuplicateProviderStopSignal(signal)) {
+      return false;
+    }
+
+    if (
+      signal.providerSessionId &&
+      session.providerRuntime?.providerSessionId !== signal.providerSessionId
+    ) {
+      await this.sessionStore.updateSession(sessionId, {
+        providerRuntime: {
+          ...session.providerRuntime,
+          provider: signal.provider,
+          providerSessionId: signal.providerSessionId,
+        },
+      });
+    }
+
+    for (let attempt = 0; attempt < PROVIDER_STOP_SETTLE_RETRY_COUNT; attempt += 1) {
+      const nextSession = await this.sessionStore.getSession(sessionId);
+      if (!nextSession || !isFinalOnlyProviderSession(nextSession)) {
+        return false;
+      }
+
+      const transcriptResult = await this.transcriptReader.readTranscriptState(nextSession).catch(() => null);
+      const transcriptState = transcriptResult?.state ?? null;
+      if (shouldAcceptTranscriptFinal(nextSession, transcriptState)) {
+        await this.settleAssistantMessage(sessionId, transcriptState.content);
+        return true;
+      }
+
+      if (attempt < PROVIDER_STOP_SETTLE_RETRY_COUNT - 1) {
+        await wait(PROVIDER_STOP_SETTLE_RETRY_MS);
+      }
+    }
+
+    return false;
   }
 
   async handleTerminalSnapshot(sessionId: string, snapshot: TerminalSnapshot) {
@@ -292,6 +341,24 @@ export class SessionSupervisor extends EventEmitter<SupervisorEvents> {
     if (!timer) return;
     clearTimeout(timer);
     this.assistantTimers.delete(sessionId);
+  }
+
+  private isDuplicateProviderStopSignal(signal: ProviderStopSignal) {
+    const now = Date.now();
+    for (const [key, seenAt] of this.providerStopSignals) {
+      if (now - seenAt > PROVIDER_STOP_DEDUPE_TTL_MS) {
+        this.providerStopSignals.delete(key);
+      }
+    }
+
+    const key = [
+      signal.sessionId,
+      signal.provider,
+      signal.providerTurnId ?? signal.providerSessionId ?? 'stop',
+    ].join(':');
+    const existing = this.providerStopSignals.get(key);
+    this.providerStopSignals.set(key, now);
+    return typeof existing === 'number' && now - existing <= PROVIDER_STOP_DEDUPE_TTL_MS;
   }
 
   private async syncBootstrapTranscript(session: Session) {

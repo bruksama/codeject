@@ -9,6 +9,7 @@ import { optionalLocalAuth } from './middleware/auth-middleware.js';
 import { authRoutes } from './routes/auth-routes.js';
 import { configRoutes } from './routes/config-routes.js';
 import { healthRoutes } from './routes/health-routes.js';
+import { createInternalProviderHooksRoutes } from './routes/internal-provider-hooks-routes.js';
 import { createSessionsRoutes } from './routes/sessions-routes.js';
 import { createTunnelRoutes } from './routes/tunnel-routes.js';
 import { authService } from './services/auth-service.js';
@@ -63,6 +64,7 @@ async function bootstrap() {
 
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api/internal', createInternalProviderHooksRoutes(sessionStore, sessionSupervisor));
   app.use('/api/sessions', optionalLocalAuth, createSessionsRoutes(terminalSessionManager));
   app.use('/api/config', optionalLocalAuth, configRoutes);
   app.use('/api/tunnel', optionalLocalAuth, createTunnelRoutes(tunnelManager));

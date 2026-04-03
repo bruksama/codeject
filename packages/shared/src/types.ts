@@ -9,6 +9,7 @@ import {
   ConnectionStatusSchema,
   MessageRoleSchema,
   MessageSchema,
+  ProviderStopSignalSchema,
   ServerWebSocketMessageSchema,
   SurfaceModeSchema,
   SurfaceRequirementSchema,
@@ -64,6 +65,7 @@ export type ChatActionOption = z.infer<typeof ChatActionOptionSchema>;
 
 export interface ProviderRuntime {
   provider: 'claude' | 'codex' | 'generic';
+  hookToken?: string;
   providerSessionId?: string;
   transcriptPath?: string;
 }
@@ -88,6 +90,7 @@ export interface Session {
 export type TerminalKey = z.infer<typeof TerminalKeySchema>;
 export type ClientWebSocketMessage = z.infer<typeof ClientWebSocketMessageSchema>;
 export type ServerWebSocketMessage = z.infer<typeof ServerWebSocketMessageSchema>;
+export type ProviderStopSignal = z.infer<typeof ProviderStopSignalSchema>;
 
 export type TunnelLifecycleState = 'active' | 'inactive' | 'starting' | 'stopping' | 'error';
 

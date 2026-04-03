@@ -45,7 +45,7 @@ export class CliManager extends EventEmitter<CliManagerEvents> {
     }
 
     const adapter = this.resolveAdapter(session.cliProgram);
-    const spawnConfig = adapter.createSpawnConfig(session.cliProgram, session.sessionOptions);
+    const spawnConfig = adapter.createSpawnConfig(session.cliProgram, session.sessionOptions, session);
     const pty = spawn(spawnConfig.command, spawnConfig.args, {
       cols: spawnConfig.ptyOptions?.cols ?? session.sessionOptions?.terminal?.cols ?? 120,
       cwd: expandHomePath(session.workspacePath),

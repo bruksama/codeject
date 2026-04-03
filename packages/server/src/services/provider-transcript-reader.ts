@@ -124,16 +124,21 @@ export class ProviderTranscriptReader {
   }
 
   private async persistMetadata(session: Session, metadata: ProviderRuntimeMetadata) {
+    const nextProviderRuntime = {
+      ...session.providerRuntime,
+      ...metadata,
+    };
     if (
-      session.providerRuntime?.provider === metadata.provider &&
-      session.providerRuntime?.providerSessionId === metadata.providerSessionId &&
-      session.providerRuntime?.transcriptPath === metadata.transcriptPath
+      session.providerRuntime?.provider === nextProviderRuntime.provider &&
+      session.providerRuntime?.providerSessionId === nextProviderRuntime.providerSessionId &&
+      session.providerRuntime?.transcriptPath === nextProviderRuntime.transcriptPath &&
+      session.providerRuntime?.hookToken === nextProviderRuntime.hookToken
     ) {
       return false;
     }
 
     await this.sessionStore.updateSession(session.id, {
-      providerRuntime: metadata,
+      providerRuntime: nextProviderRuntime,
     });
     return true;
   }

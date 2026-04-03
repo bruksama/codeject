@@ -74,6 +74,78 @@ test('handleStatus retries briefly so a delayed final transcript still settles',
   assert.equal(next?.messages.at(-1)?.isStreaming, false);
 });
 
+test('handleProviderStopSignal retries briefly so a delayed final transcript still settles', async () => {
+  const transcriptPath = await writeTempFile('');
+  const session = createCodexSession(transcriptPath);
+  const store = new TestSessionStore();
+  await store.createSession(session);
+  const supervisor = new SessionSupervisor(store as unknown as SessionStore);
+
+  await supervisor.handleChatPrompt(session.id, 'Explain the result');
+
+  const delayedWrite = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      void fs
+        .writeFile(
+          transcriptPath,
+          codexEntries([{ id: 'assistant-final', phase: 'final_answer', text: 'Final after stop hook' }])
+        )
+        .then(() => resolve());
+    }, 50);
+  });
+
+  await supervisor.handleProviderStopSignal(session.id, {
+    event: 'stop',
+    provider: 'codex',
+    providerTurnId: 'turn-1',
+    sessionId: session.id,
+  });
+  await delayedWrite;
+
+  const next = await store.getSession(session.id);
+  assert.equal(next?.chatState?.phase, 'idle');
+  assert.equal(next?.messages.at(-1)?.content, 'Final after stop hook');
+});
+
+test('handleProviderStopSignal dedupes repeated signals for the same turn', async () => {
+  const transcriptPath = await writeTempFile('');
+  const session = createCodexSession(transcriptPath);
+  const store = new TestSessionStore();
+  await store.createSession(session);
+  const supervisor = new SessionSupervisor(store as unknown as SessionStore);
+
+  await supervisor.handleChatPrompt(session.id, 'Explain once');
+  const delayedWrite = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      void fs
+        .writeFile(
+          transcriptPath,
+          codexEntries([{ id: 'assistant-final', phase: 'final_answer', text: 'Final once' }])
+        )
+        .then(() => resolve());
+    }, 50);
+  });
+
+  const first = await supervisor.handleProviderStopSignal(session.id, {
+    event: 'stop',
+    provider: 'codex',
+    providerTurnId: 'turn-2',
+    sessionId: session.id,
+  });
+  await delayedWrite;
+  const second = await supervisor.handleProviderStopSignal(session.id, {
+    event: 'stop',
+    provider: 'codex',
+    providerTurnId: 'turn-2',
+    sessionId: session.id,
+  });
+
+  const next = await store.getSession(session.id);
+  assert.equal(first, true);
+  assert.equal(second, false);
+  assert.equal(next?.messages.filter((message) => message.role === 'assistant').length, 1);
+});
+
 function createCodexSession(transcriptPath: string): Session {
   const now = new Date();
   return {
@@ -113,4 +185,21 @@ async function writeTempFile(content: string) {
   const filePath = path.join(dir, 'transcript.jsonl');
   await fs.writeFile(filePath, content);
   return filePath;
+}
+
+function codexEntries(entries: Array<{ id: string; phase: string; text: string }>) {
+  return entries
+    .map((entry) =>
+      JSON.stringify({
+        type: 'response_item',
+        payload: {
+          content: [{ text: entry.text, type: 'output_text' }],
+          id: entry.id,
+          phase: entry.phase,
+          role: 'assistant',
+          type: 'message',
+        },
+      })
+    )
+    .join('\n');
 }
