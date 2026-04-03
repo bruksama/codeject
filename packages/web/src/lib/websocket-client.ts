@@ -40,11 +40,17 @@ export class WebSocketClient {
     this.socket = socket;
 
     socket.addEventListener('open', () => {
+      if (this.socket !== socket) {
+        return;
+      }
       this.reconnectAttempts = 0;
       this.flushQueue();
     });
 
     socket.addEventListener('message', (event) => {
+      if (this.socket !== socket) {
+        return;
+      }
       try {
         const rawMessage = JSON.parse(event.data);
         const parsedMessage = ServerWebSocketMessageSchema.safeParse(rawMessage);
@@ -78,6 +84,9 @@ export class WebSocketClient {
     });
 
     socket.addEventListener('close', () => {
+      if (this.socket !== socket) {
+        return;
+      }
       this.socket = null;
       this.options.onStatus?.('disconnected');
       if (this.manuallyClosed) {
@@ -86,7 +95,11 @@ export class WebSocketClient {
       this.scheduleReconnect();
     });
 
-    socket.addEventListener('error', () => undefined);
+    socket.addEventListener('error', () => {
+      if (this.socket !== socket) {
+        return;
+      }
+    });
   }
 
   disconnect() {

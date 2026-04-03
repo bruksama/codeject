@@ -200,4 +200,33 @@ describe('WebSocketClient', () => {
     expect(onError).toHaveBeenCalledWith('Terminal session is not active', 'session');
     expect(onError).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores stale socket events after a reconnect creates a new current socket', () => {
+    const onMessage = vi.fn();
+    const onStatus = vi.fn();
+    const client = new WebSocketClient('ws://example.test/ws/session-1', {
+      onMessage,
+      onStatus,
+    });
+
+    client.connect();
+    const firstSocket = MockWebSocket.instances[0];
+    firstSocket.emitServerClose();
+    vi.advanceTimersByTime(1_000);
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+    const secondSocket = MockWebSocket.instances[1];
+    secondSocket.emitMessage(createReadyMessage());
+
+    firstSocket.emitMessage(createReadyMessage());
+    firstSocket.emitServerClose();
+
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(onStatus.mock.calls.map(([status]) => status)).toEqual([
+      'connecting',
+      'disconnected',
+      'connecting',
+      'connected',
+    ]);
+  });
 });

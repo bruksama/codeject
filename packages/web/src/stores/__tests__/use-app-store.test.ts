@@ -42,6 +42,15 @@ function createSession(id: string): Session {
   };
 }
 
+function createMessage(id: string, content: string) {
+  return {
+    content,
+    id,
+    role: 'assistant' as const,
+    timestamp: new Date('2026-03-23T09:00:01.000Z'),
+  };
+}
+
 function resetStore() {
   useAppStore.setState({
     activeSessionId: null,
@@ -152,5 +161,26 @@ describe('useAppStore', () => {
     useAppStore.getState().setSessions([createSession('session-1'), createSession('session-2')]);
 
     expect(useAppStore.getState().activeSessionId).toBe('session-1');
+  });
+
+  it('keeps live messages idempotent when the same websocket frame arrives twice', () => {
+    useAppStore.getState().addSession(createSession('session-1'));
+
+    const message = createMessage('message-1', 'Final answer');
+    useAppStore.getState().addMessage('session-1', message);
+    useAppStore.getState().addMessage('session-1', message);
+
+    expect(useAppStore.getState().sessions[0]?.messages).toEqual([message]);
+  });
+
+  it('dedupes duplicate message ids when a session payload replaces messages', () => {
+    useAppStore.getState().addSession(createSession('session-1'));
+
+    const message = createMessage('message-1', 'Final answer');
+    useAppStore.getState().updateSession('session-1', {
+      messages: [message, message],
+    });
+
+    expect(useAppStore.getState().sessions[0]?.messages).toEqual([message]);
   });
 });

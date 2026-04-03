@@ -34,6 +34,34 @@ const defaultState = {
   },
 };
 
+function dedupeMessagesById(messages: Message[]) {
+  const deduped: Message[] = [];
+  const indexById = new Map<string, number>();
+
+  for (const message of messages) {
+    const existingIndex = indexById.get(message.id);
+    if (existingIndex === undefined) {
+      indexById.set(message.id, deduped.length);
+      deduped.push(message);
+      continue;
+    }
+
+    deduped[existingIndex] = {
+      ...deduped[existingIndex],
+      ...message,
+    };
+  }
+
+  return deduped;
+}
+
+function normalizeSessionMessages(session: Session): Session {
+  return {
+    ...session,
+    messages: dedupeMessagesById(session.messages),
+  };
+}
+
 export const useAppStore = create<StoreState>()(
   persist(
     (set) => ({
@@ -49,13 +77,14 @@ export const useAppStore = create<StoreState>()(
               ? {
                   ...session,
                   lastMessageAt: message.timestamp,
-                  messages: [...session.messages, message],
+                  messages: dedupeMessagesById([...session.messages, message]),
                 }
               : session
           ),
         })),
 
-      addSession: (session) => set((state) => ({ sessions: [session, ...state.sessions] })),
+      addSession: (session) =>
+        set((state) => ({ sessions: [normalizeSessionMessages(session), ...state.sessions] })),
 
       clearSessions: () => set({ activeSessionId: null, sessions: [] }),
 
@@ -83,7 +112,7 @@ export const useAppStore = create<StoreState>()(
             sessions.some((session) => session.id === state.activeSessionId)
               ? state.activeSessionId
               : (sessions[0]?.id ?? null),
-          sessions,
+          sessions: sessions.map(normalizeSessionMessages),
         })),
 
       updateCliProgram: (id, updates) =>
@@ -118,7 +147,16 @@ export const useAppStore = create<StoreState>()(
       updateSession: (id, updates) =>
         set((state) => ({
           sessions: state.sessions.map((session) =>
-            session.id === id ? { ...session, ...updates } : session
+            session.id === id
+              ? {
+                  ...session,
+                  ...updates,
+                  messages:
+                    'messages' in updates && Array.isArray(updates.messages)
+                      ? dedupeMessagesById(updates.messages)
+                      : session.messages,
+                }
+              : session
           ),
         })),
 
@@ -127,12 +165,15 @@ export const useAppStore = create<StoreState>()(
 
       upsertSession: (session) =>
         set((state) => {
-          const exists = state.sessions.some((item) => item.id === session.id);
+          const normalizedSession = normalizeSessionMessages(session);
+          const exists = state.sessions.some((item) => item.id === normalizedSession.id);
           return {
-            activeSessionId: state.activeSessionId ?? session.id,
+            activeSessionId: state.activeSessionId ?? normalizedSession.id,
             sessions: exists
-              ? state.sessions.map((item) => (item.id === session.id ? session : item))
-              : [session, ...state.sessions],
+              ? state.sessions.map((item) =>
+                  item.id === normalizedSession.id ? normalizedSession : item
+                )
+              : [normalizedSession, ...state.sessions],
           };
         }),
     }),

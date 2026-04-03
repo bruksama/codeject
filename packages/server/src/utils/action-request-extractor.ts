@@ -211,6 +211,10 @@ function detectUnsupportedTerminalRequirement(text: string) {
     .filter(Boolean);
 
   for (let index = lines.length - 1; index >= Math.max(0, lines.length - 6); index -= 1) {
+    if (hasLaterResumedShellPrompt(lines, index)) {
+      continue;
+    }
+
     if (!UNSUPPORTED_TERMINAL_REQUIRED_PATTERNS.some((pattern) => pattern.test(lines[index] ?? ''))) {
       continue;
     }
@@ -231,6 +235,7 @@ function extractTailPromptWindow(text: string) {
   for (let index = lines.length - 1; index >= startIndex; index -= 1) {
     const line = lines[index];
     if (!isGenericPromptCandidate(line)) continue;
+    if (hasLaterResumedShellPrompt(lines, index)) continue;
 
     return {
       context: lines.slice(Math.max(0, index - 2), index + 1).join('\n'),
@@ -289,4 +294,21 @@ function isLikelyNonInputLabel(line: string) {
 
 function buildActionId(kind: string, seed: string) {
   return createHash('sha1').update(`${kind}:${seed}`).digest('hex').slice(0, 12);
+}
+
+function hasLaterResumedShellPrompt(lines: string[], index: number) {
+  return lines.slice(index + 1).some(isResumedShellPromptLine);
+}
+
+function isResumedShellPromptLine(line: string) {
+  if (!SHELL_PROMPT_PATTERN.test(line)) {
+    return false;
+  }
+
+  if (/^(?:bruk@|current:)/i.test(line)) {
+    return true;
+  }
+
+  const promptContent = line.replace(/^(?:\$|#|>|❯)\s*/, '').trim();
+  return promptContent.length > 0;
 }

@@ -32,3 +32,43 @@ test('analyzeTerminalInteraction still accepts short question-style prompts', ()
   assert.equal(result.actionRequest?.kind, 'free-input');
   assert.equal(result.actionRequest?.prompt, 'Which path?');
 });
+
+test('analyzeTerminalInteraction ignores stale free-input prompts once a shell prompt follows', () => {
+  const result = analyzeTerminalInteraction({
+    snapshotText: 'Paste token:\n❯ Explain this codebase\n~/projects/codeject · main',
+  });
+
+  assert.equal(result.requirement, 'terminal-available');
+  assert.equal(result.actionRequest, undefined);
+  assert.equal(result.reason, undefined);
+});
+
+test('analyzeTerminalInteraction keeps active free-input prompts when only the cursor line follows', () => {
+  const result = analyzeTerminalInteraction({
+    snapshotText: 'Paste token:\n❯',
+  });
+
+  assert.equal(result.requirement, 'terminal-required');
+  assert.equal(result.actionRequest?.kind, 'free-input');
+  assert.equal(result.actionRequest?.prompt, 'Paste token:');
+});
+
+test('analyzeTerminalInteraction ignores stale confirm prompts once a shell prompt follows', () => {
+  const result = analyzeTerminalInteraction({
+    snapshotText: 'Allow tool execution? (y/n)\n❯ Explain this codebase\n~/projects/codeject · main',
+  });
+
+  assert.equal(result.requirement, 'terminal-available');
+  assert.equal(result.actionRequest, undefined);
+  assert.equal(result.reason, undefined);
+});
+
+test('analyzeTerminalInteraction keeps active confirm prompts when only the cursor line follows', () => {
+  const result = analyzeTerminalInteraction({
+    snapshotText: 'Allow tool execution? (y/n)\n❯',
+  });
+
+  assert.equal(result.requirement, 'terminal-required');
+  assert.equal(result.actionRequest?.kind, 'confirm');
+  assert.equal(result.actionRequest?.prompt, 'Allow tool execution?');
+});
