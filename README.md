@@ -36,6 +36,24 @@ npm run safe-stop
 - UI: `http://localhost:4028`
 - API + WebSocket: `http://localhost:3500`
 
+## CLI quản trị hooks toàn máy
+
+Codeject hiện có CLI quản trị riêng cho hook integration:
+
+```bash
+npm run codeject -- install
+npm run codeject -- status
+npm run codeject -- repair
+npm run codeject -- uninstall
+```
+
+Hiện tại `install` chỉ cài component `hooks`:
+- cài global stop hook cho `Claude Code` và `OpenAI Codex`,
+- ghi wrapper vào `~/.codeject/bin/`,
+- lưu state tại `~/.codeject/install-state.json`.
+
+`uninstall` sẽ gỡ hook integration và xóa toàn bộ `~/.codeject`, nên cả config/session local của Codeject cũng bị xóa.
+
 ## Tài liệu
 
 | Chủ đề | Tiếng Việt | English |
@@ -94,6 +112,24 @@ npm run safe-stop
 
 - UI: `http://localhost:4028`
 - API + WebSocket: `http://localhost:3500`
+
+## Global Hook Admin CLI
+
+Codeject now ships a small admin CLI for machine-level hook integration:
+
+```bash
+npm run codeject -- install
+npm run codeject -- status
+npm run codeject -- repair
+npm run codeject -- uninstall
+```
+
+Current `install` scope is `hooks` only:
+- installs global stop hooks for `Claude Code` and `OpenAI Codex`,
+- writes wrapper scripts under `~/.codeject/bin/`,
+- persists install state at `~/.codeject/install-state.json`.
+
+`uninstall` removes the hook integration and deletes all of `~/.codeject`, so local Codeject config and sessions are removed too.
 
 ## Documentation
 

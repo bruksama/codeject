@@ -13,6 +13,7 @@
 
 ## Main components
 
+- `packages/codeject-cli`: Node.js admin CLI for global hook install/status/repair/uninstall.
 - `packages/web`: Next.js 16 + React 19 UI, mobile-first.
 - `packages/server`: Express 5 API + WebSocket, auth, persistence, tmux/tunnel orchestration.
 - `packages/shared`: Shared TypeScript types and Zod wire schemas used by both web and server.
@@ -24,6 +25,7 @@
 - `Claude Code` and `OpenAI Codex` use final-only assistant rendering: keep loading while transcript is still working, then patch one final assistant answer.
 - If browser notifications are enabled for that device, the web app can alert on action-needed, reply-ready, terminal-error, and session-finished events while the tab is unfocused.
 - Optional: server manages a single Cloudflare Tunnel process to expose the local web UI remotely, either as a quick tunnel or a named token-based tunnel with optional auto-start.
+- Optional admin CLI: `codeject install|status|repair|uninstall` manages global Claude/Codex stop hooks and stores installer state in `~/.codeject/install-state.json`.
 
 ## Runtime model
 
@@ -58,8 +60,8 @@
 
 ## Source-of-truth docs
 
-- Human docs (Vietnamese): [`docs/*.md`](../architecture.md)
-- LLM docs (English, compact): [`docs/llm/*.md`](./project-summary.md)
+- Human docs (Vietnamese): [`docs/architecture.md`](../architecture.md), [`docs/configuration.md`](../configuration.md), [`docs/usage-guide.md`](../usage-guide.md)
+- LLM docs (English, compact): [`docs/llm/architecture.md`](./architecture.md), [`docs/llm/project-summary.md`](./project-summary.md), [`docs/llm/api-reference.md`](./api-reference.md)
 
 ## Recent cleanup/stabilization notes
 

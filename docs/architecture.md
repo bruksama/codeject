@@ -9,6 +9,7 @@ flowchart LR
   B[Browser] -->|Static files| E[Express Server :3500]
   B -->|REST /api/*| E
   B -->|WebSocket /ws/:sessionId| E
+  H[Claude/Codex Stop Hooks] -->|POST /api/internal/provider-stop| E
   E --> T[tmux Runtime]
   E --> F[(~/.codeject)]
   E --> C[cloudflared]
@@ -18,6 +19,7 @@ flowchart LR
 
 | Package | Vai trò | Công nghệ | Kết nối chính |
 |---|---|---|---|
+| `packages/codeject-cli` | CLI quản trị hook toàn máy: `install`, `status`, `repair`, `uninstall` | Node.js, Bash templates | `~/.claude/settings.json`, `~/.codex/config.toml`, `~/.codex/hooks.json`, `~/.codeject` |
 | `packages/web` | UI mobile-first, chat surface, action cards, terminal tab nhẹ | Next.js 16, React 19, Zustand, Tailwind CSS 4 | `/api/*`, `/ws/:sessionId` |
 | `packages/server` | Serve static, API, auth, persistence, websocket, tunnel orchestration | Express 5, ws, tmux, cloudflared | `packages/web`, `packages/shared`, `~/.codeject` |
 | `packages/shared` | Hợp đồng kiểu dữ liệu và schema runtime | TypeScript, Zod | Web + Server |
@@ -57,11 +59,29 @@ sequenceDiagram
   S-->>RB: API/WS response
 ```
 
+### Stop-hook acceleration flow
+
+```mermaid
+sequenceDiagram
+  participant P as Claude/Codex CLI
+  participant H as Global Stop Hook
+  participant S as Express Server
+  participant R as Transcript Reader
+
+  P->>H: Stop event payload
+  H->>S: POST /api/internal/provider-stop
+  S->>S: Verify bearer hook token + session/provider
+  S->>R: Retry transcript read briefly
+  R-->>S: Final transcript content
+  S-->>B: chat:update / surface:update
+```
+
 ## Lưu trữ
 
 | Dữ liệu | Vị trí | Định dạng |
 |---|---|---|
 | Cấu hình ứng dụng | `~/.codeject/config.json` | JSON |
+| Install state | `~/.codeject/install-state.json` | JSON |
 | Danh sách session | `~/.codeject/sessions/*.json` | JSON |
 | Scrollback terminal | tmux history | Runtime buffer |
 | Tuỳ chọn UI (`fontSize`, `accentColor`, `notifications`) | Browser storage | LocalStorage |
@@ -78,11 +98,13 @@ Request local được bỏ qua auth để thao tác nhanh trên máy host. Requ
 3. Terminal tab là snapshot + input nhẹ, chưa phải emulator đầy đủ.
 4. `Claude Code` và `OpenAI Codex` render theo final-only transcript.
 5. Opaque arrow-key flow hoặc full-screen TUI có thể cần thao tác trực tiếp ở host.
+6. Global hook wrappers chỉ dùng stop signal để tăng tốc settle transcript; final assistant text vẫn chỉ lấy từ transcript.
 
 ## Key source files
 
 | Nếu sửa | File nên đọc trước |
 |---|---|
+| Hook installer CLI | `packages/codeject-cli/src/index.ts`, `packages/codeject-cli/src/commands/*.ts`, `packages/codeject-cli/src/providers/*.ts` |
 | WebSocket contract | `packages/shared/src/schemas.ts`, `packages/shared/src/types.ts` |
 | WS handler server | `packages/server/src/websocket/websocket-handler.ts` |
 | WS client web | `packages/web/src/lib/websocket-client.ts` |

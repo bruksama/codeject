@@ -42,6 +42,16 @@
   - `TerminalRuntime`, `TerminalSnapshot`
   - Zod schemas for `ClientWebSocketMessage`, `ServerWebSocketMessage`, and nested wire payloads
 
+### Admin CLI (`packages/codeject-cli`)
+
+- Role: machine-level hook installer/repair tool exposed as `codeject install|status|repair|uninstall`.
+- Technology: Node.js CLI with Bash wrapper templates.
+- Responsibilities:
+  - Install and remove Codeject-managed Claude/Codex stop hooks.
+  - Track install-state in `~/.codeject/install-state.json`.
+  - Recreate wrapper/config drift with `repair`.
+  - Report health for wrapper, config, and feature-flag state with `status`.
+
 ### tmux runtime
 
 - Role: runtime source of truth for terminal state and CLI processes.
@@ -67,7 +77,9 @@
 - Default root: `~/.codeject` (overridable via `CODEJECT_HOME`).
 - Files:
   - `config.json`: auth key and app configuration.
+  - `install-state.json`: hook installer manifest for `codeject install|status|repair|uninstall`.
   - `sessions/*.json`: persisted session metadata.
+- `codeject-cli` also manages wrapper scripts under `~/.codeject/bin/` and provider config files under `~/.claude/` and `~/.codex/`.
 - Terminal scrollback is kept inside tmux history, not in JSON files.
 - Per-device remote bearer keys are not stored in `~/.codeject`; they live in each browser's local storage.
 
@@ -86,6 +98,7 @@
 9. If browser notifications are enabled and the tab is unfocused, the web app can emit notifications for action-needed, reply-ready, terminal-error, and session-finished events.
 10. When a previously connected WebSocket drops, the web UI tracks the disconnect cycle to show reconnect/disconnect status, elapsed disconnect time, and a manual reconnect action.
 11. If no safe card can be derived, the server still marks the session `terminal-required`; the UI shows a warning/banner state and can route the user to the terminal tab for direct input.
+12. For Codeject-launched Claude/Codex sessions, global stop hooks can call `/api/internal/provider-stop`; the server validates a per-session hook token, retries transcript reads briefly, and still persists final assistant text only from transcript parsing.
 
 ### Remote access flow
 
@@ -104,4 +117,3 @@
 - Local requests bypass auth; non-local REST and WebSocket connections both require the same API key, but transport it differently.
 - The terminal tab is still snapshot-based, so opaque arrow-key or full-screen TUIs are not first-class emulated terminals yet.
 - Root workspace verification now expects `npm test` to run both server `node:test` and web Vitest suites.
-

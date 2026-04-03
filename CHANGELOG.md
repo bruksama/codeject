@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-03 — Global Hook Installer and Stop-Signal Integration
+
+### Added
+- Added a new monorepo admin CLI exposed as `codeject` with `install`, `uninstall`, `status`, and `repair`.
+- Added Codeject-managed global stop-hook integration for `Claude Code` and `OpenAI Codex`.
+- Added per-session hook token env injection plus an internal `/api/internal/provider-stop` route to accelerate transcript settlement.
+- Added CLI and server tests for hook config merge/removal and authenticated provider stop-signal handling.
+
+### Changed
+- Changed Codex and Claude runtime launch paths to inject Codeject hook env only for Codeject-managed sessions.
+- Updated README, architecture, configuration, and usage docs in Vietnamese and English for hook install/uninstall flow and `~/.codeject` cleanup behavior.
+
 ## 2026-03-28 — Dev Runtime Supervisor
 
 ### Added

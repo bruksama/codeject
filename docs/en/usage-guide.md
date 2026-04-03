@@ -38,6 +38,17 @@ Codeject is optimized for fast mobile control: read transcript, answer action ca
 
 Full notification setup is in [`docs/en/configuration.md`](./configuration.md).
 
+## Install global stop hooks
+
+1. Run `npm run codeject -- install`.
+2. Check health with `npm run codeject -- status`.
+3. If wrappers or config drift, run `npm run codeject -- repair`.
+4. To remove everything, run `npm run codeject -- uninstall`.
+
+Current `install` scope is `hooks` only. `status` reports `healthy`, `drifted`, or `not installed`; `repair` only works after a prior `install`.
+
+> **Warning:** `uninstall` also deletes `~/.codeject`, so local Codeject config and sessions are removed.
+
 ## Remote access from phone
 
 1. Enable tunnel in `Settings > Remote Access` (quick or named).
