@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "codeject": "npm exec --workspace @codeject/cli -- codeject",
     "dev": "node ./scripts/dev-supervisor.mjs",
     "safe-stop": "bash ./scripts/safe-stop-runtime.sh",
     "build": "turbo run build",

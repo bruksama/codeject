@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -z "${CODEJECT_SESSION_ID:-}" || -z "${CODEJECT_HOOK_TOKEN:-}" || -z "${CODEJECT_SERVER_URL:-}" ]]; then
+  exit 0
+fi
+
+payload="$(cat || true)"
+
+PAYLOAD="$payload" node <<'NODE'
+const payload = process.env.PAYLOAD ?? '';
+const sessionId = process.env.CODEJECT_SESSION_ID;
+const token = process.env.CODEJECT_HOOK_TOKEN;
+const serverUrl = process.env.CODEJECT_SERVER_URL;
+
+if (!sessionId || !token || !serverUrl) {
+  process.exit(0);
+}
+
+let parsed = {};
+try {
+  parsed = payload ? JSON.parse(payload) : {};
+} catch {
+  process.exit(0);
+}
+
+async function main() {
+  const body = JSON.stringify({
+    event: 'stop',
+    provider: 'codex',
+    providerSessionId: typeof parsed.session_id === 'string' ? parsed.session_id : undefined,
+    providerTurnId: typeof parsed.turn_id === 'string' ? parsed.turn_id : undefined,
+    sessionId,
+  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+  try {
+    await fetch(new URL('/api/internal/provider-stop', serverUrl), {
+      body,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+      signal: controller.signal,
+    });
+  } catch {
+    // Hooks must stay silent and passive.
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+void main().finally(() => process.exit(0));
+NODE

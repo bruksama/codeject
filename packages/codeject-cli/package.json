@@ -1,0 +1,14 @@
+{
+  "name": "@codeject/cli",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "codeject": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node ./scripts/copy-templates.mjs",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"src/*.test.ts\" \"src/**/*.test.ts\""
+  }
+}
